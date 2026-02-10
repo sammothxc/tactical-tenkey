@@ -213,9 +213,6 @@ void setup() {
     
     lastActivity = millis();
     updateDisplay();
-    
-    Serial.println("CALCUL8 ready");
-    
 }
 
 
