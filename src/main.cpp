@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <Wire.h>
+#include "icons.h"
 
 #define SDA_PIN 22
 #define SCL_PIN 23
