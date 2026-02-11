@@ -3,6 +3,7 @@
 #include <U8g2lib.h>
 #include <Wire.h>
 #include "icons.h"
+#include "macros.h"
 
 #define SDA_PIN 22
 #define SCL_PIN 23
@@ -125,10 +126,29 @@ String formatResult(double result) {
 void handleKey(char key) {
     lastActivity = millis();
     
-    // FN combo: quick exit to normal calc mode
+    // FN combo: quick exit
     if (key == 'F') {
+        macroCancel();
         functionName = "";
         numpadMode = false;
+        updateDisplay();
+        return;
+    }
+    
+    // if macro is awaiting input, intercept '=' to feed value
+    if (macro.state == MACRO_AWAITING_INPUT && key == '=') {
+        double value = displayValue.toDouble();
+        
+        if (macroInput(value)) {
+            // macro complete
+            displayValue = formatResult(macro.result);
+            functionName = macro.functionName;
+            macro.state = MACRO_IDLE;
+        } else {
+            // need more params
+            displayValue = "0";
+        }
+        newEntry = true;
         updateDisplay();
         return;
     }
