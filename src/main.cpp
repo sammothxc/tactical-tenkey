@@ -1,4 +1,4 @@
-#define FIRMWARE_VERSION "0.1.0"
+#define FW_VERSION "0.1.0"
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <Wire.h>
@@ -7,20 +7,18 @@
 #define SDA_PIN 22
 #define SCL_PIN 23
 #define WAKE_PIN 0  // Enter key
+#define SLEEP_TIMEOUT 60000
 
 const uint8_t ROW_PINS[4] = {1, 2, 21, 16};
 const uint8_t COL_PINS[4] = {18, 20, 19, 17};
 
+const char WAKE_KEY = '=';
 const char KEYMAP[4][4] = {
     {'C', '/', '*', '-'},
     {'7', '8', '9', '+'},
     {'4', '5', '6', '.'},
     {'1', '2', '3', '0'}
 };
-
-const char WAKE_KEY = '=';
-
-#define SLEEP_TIMEOUT 60000
 
 U8G2_SSD1309_128X64_NONAME0_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
@@ -44,6 +42,7 @@ void initMatrix();
 char scanMatrix();
 char scanWakeKey();
 void handleKey(char key);
+void showBootScreen();
 void drawTopBar();
 void drawBottomBar();
 void drawMainDisplay();
@@ -189,8 +188,19 @@ void handleKey(char key) {
             functionName = "";
         }
     }
-    
     updateDisplay();
+}
+
+
+void showBootScreen() {
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_logisoso16_tr);
+    u8g2.drawStr(10, 25, "Tactical");
+    u8g2.drawStr(10, 45, "Tenkey");
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(100, 64, "v " FW_VERSION);
+    u8g2.sendBuffer();
+    delay(1000);
 }
 
 
@@ -292,9 +302,7 @@ void goToSleep() {
     u8g2.drawStr(0, 32, "Sleeping...");
     u8g2.sendBuffer();
     delay(500);
-    
     u8g2.setPowerSave(1);
-    
     esp_deep_sleep_enable_gpio_wakeup(1ULL << WAKE_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
     esp_deep_sleep_start();
 }
@@ -302,14 +310,15 @@ void goToSleep() {
 
 void setup() {
     Serial.begin(115200);
-    
     pinMode(WAKE_PIN, INPUT_PULLUP);
     initMatrix();
-    
     Wire.begin(SDA_PIN, SCL_PIN);
     u8g2.begin();
     u8g2.setContrast(255);
-    
+    esp_sleep_wakeup_cause_t wakeup = esp_sleep_get_wakeup_cause();
+    if (wakeup == ESP_SLEEP_WAKEUP_UNDEFINED) {
+        showBootScreen();
+    }
     lastActivity = millis();
     updateDisplay();
 }
@@ -328,6 +337,5 @@ void loop() {
     if (millis() - lastActivity > SLEEP_TIMEOUT) {
         goToSleep();
     }
-    
     delay(20);
 }
