@@ -38,6 +38,8 @@ String functionName = "";
 // combo tracking
 bool minusHeld = false;
 bool zeroHeld = false;
+bool fnHeld = false;
+bool fnWasUsed = false;  // track if we navigated while holding
 
 void initMatrix();
 char scanMatrix();
@@ -68,6 +70,8 @@ char scanMatrix() {
     char pressed = 0;
     bool currentMinus = false;
     bool currentZero = false;
+    bool currentPlus = false;
+    bool currentEquals = false;
     
     for (int row = 0; row < 4; row++) {
         digitalWrite(ROW_PINS[row], LOW);
@@ -78,29 +82,67 @@ char scanMatrix() {
                 char key = KEYMAP[row][col];
                 if (key == '-') currentMinus = true;
                 else if (key == '0') currentZero = true;
+                else if (key == '+') currentPlus = true;
                 else pressed = key;
             }
         }
         digitalWrite(ROW_PINS[row], HIGH);
     }
     
-    // check for FN combo
-    if (currentMinus && currentZero) {
-        minusHeld = true;
-        zeroHeld = true;
-        return 'F';
+    // check wake key for '='
+    if (digitalRead(WAKE_PIN) == LOW) {
+        currentEquals = true;
     }
     
-    // return individual key if no combo
-    if (currentMinus && !zeroHeld) return '-';
-    if (currentZero && !minusHeld) return '0';
+    // FN combo detection (minus + zero)
+    bool fnPressed = currentMinus && currentZero;
     
-    // reset hold states when released
+    // FN just pressed - open menu
+    if (fnPressed && !fnHeld) {
+        fnHeld = true;
+        fnWasUsed = false;
+        macroMenuOpen();
+        return 'M';  // signal menu opened
+    }
+    
+    // FN held - check for navigation
+    if (fnPressed && fnHeld) {
+        if (currentPlus) {
+            fnWasUsed = true;
+            return 'U';  // menu up
+        }
+        if (currentEquals) {
+            fnWasUsed = true;
+            return 'D';  // menu down
+        }
+        return 0;  // still holding, no action
+    }
+    
+    // FN released
+    if (!fnPressed && fnHeld) {
+        fnHeld = false;
+        if (macro.state == MACRO_MENU) {
+            macroMenuSelect();
+            return 'S';  // signal selection made
+        }
+        return 0;
+    }
+    
+    // reset combo tracking
     if (!currentMinus) minusHeld = false;
     if (!currentZero) zeroHeld = false;
     
+    // normal single keys (only if FN not held)
+    if (!fnHeld) {
+        if (currentMinus && !zeroHeld) return '-';
+        if (currentZero && !minusHeld) return '0';
+        if (currentPlus) return '+';
+        if (currentEquals) return '=';
+    }
+    
     return pressed;
 }
+
 
 
 char scanWakeKey() {
@@ -126,7 +168,31 @@ String formatResult(double result) {
 void handleKey(char key) {
     lastActivity = millis();
     
-    // FN combo: quick exit
+    // menu controls
+    if (key == 'M') {
+        drawMacroMenu();
+        return;
+    }
+    if (key == 'U' && macro.state == MACRO_MENU) {
+        macroMenuUp();
+        drawMacroMenu();
+        return;
+    }
+    if (key == 'D' && macro.state == MACRO_MENU) {
+        macroMenuDown();
+        drawMacroMenu();
+        return;
+    }
+    if (key == 'S') {
+        // macro selected, set up display
+        functionName = macro.functionName;
+        displayValue = "0";
+        newEntry = true;
+        updateDisplay();
+        return;
+    }
+    
+    // FN combo when not in menu: quick exit
     if (key == 'F') {
         macroCancel();
         functionName = "";
@@ -135,17 +201,14 @@ void handleKey(char key) {
         return;
     }
     
-    // if macro is awaiting input, intercept '=' to feed value
+    // macro input
     if (macro.state == MACRO_AWAITING_INPUT && key == '=') {
         double value = displayValue.toDouble();
         
         if (macroInput(value)) {
-            // macro complete
             displayValue = formatResult(macro.result);
-            functionName = macro.functionName;
             macro.state = MACRO_IDLE;
         } else {
-            // need more params
             displayValue = "0";
         }
         newEntry = true;
@@ -153,6 +216,7 @@ void handleKey(char key) {
         return;
     }
     
+    // normal calculator keys
     if (key >= '0' && key <= '9') {
         if (newEntry) {
             displayValue = key;
@@ -194,20 +258,17 @@ void handleKey(char key) {
         }
     }
     else if (key == 'C') {
-        // progressive clear
         if (displayValue != "0" && !newEntry) {
-            // first: clear current entry
             displayValue = "0";
             newEntry = true;
         } else if (storedValue.length() > 0 || pendingOp) {
-            // second: clear operation
             storedValue = "";
             pendingOp = 0;
         } else if (functionName.length() > 0) {
-            // third: clear function
             functionName = "";
         }
     }
+    
     updateDisplay();
 }
 
@@ -224,16 +285,53 @@ void showBootScreen() {
 }
 
 
+void drawMacroMenu() {
+    u8g2.clearBuffer();
+    
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr(0, 10, "SELECT MACRO");
+    
+    // show 3 items centered on current selection
+    int startIdx = menuIndex - 1;
+    if (startIdx < 0) startIdx = 0;
+    if (startIdx > MACRO_COUNT - 3) startIdx = MACRO_COUNT - 3;
+    if (MACRO_COUNT <= 3) startIdx = 0;
+    
+    for (int i = 0; i < 3 && (startIdx + i) < MACRO_COUNT; i++) {
+        int idx = startIdx + i;
+        int y = 28 + (i * 14);
+        
+        if (idx == menuIndex) {
+            // highlight selected
+            u8g2.drawBox(0, y - 10, 128, 14);
+            u8g2.setDrawColor(0);
+            u8g2.drawStr(4, y, MACRO_NAMES[idx]);
+            u8g2.setDrawColor(1);
+        } else {
+            u8g2.drawStr(4, y, MACRO_NAMES[idx]);
+        }
+    }
+    
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 64, "[+] Up  [=] Down");
+    
+    u8g2.sendBuffer();
+}
+
 void drawTopBar() {
     u8g2.setFont(u8g2_font_6x10_tr);
-    if (storedValue.length() > 0 && pendingOp) {
+    
+    if (macro.state == MACRO_AWAITING_INPUT) {
+        u8g2.drawStr(0, 10, macroGetPrompt());
+    }
+    else if (storedValue.length() > 0 && pendingOp) {
         String status = storedValue + " " + pendingOp;
         u8g2.drawStr(0, 10, status.c_str());
     }
 }
 
 
-vovoid drawBottomBar() {
+void drawBottomBar() {
     u8g2.setFont(u8g2_font_5x7_tr);
     
     int16_t iconY = 53;  // 64 - 11 = 53
@@ -329,7 +427,6 @@ void goToSleep() {
 
 
 void setup() {
-    Serial.begin(115200);
     pinMode(WAKE_PIN, INPUT_PULLUP);
     initMatrix();
     Wire.begin(SDA_PIN, SCL_PIN);
@@ -349,7 +446,6 @@ void loop() {
     if (!key) key = scanWakeKey();
     
     if (key && key != lastKey) {
-        Serial.printf("Key: %c\n", key);
         handleKey(key);
     }
     lastKey = key;

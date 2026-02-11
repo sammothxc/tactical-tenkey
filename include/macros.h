@@ -5,6 +5,7 @@
 
 enum MacroState {
     MACRO_IDLE,
+    MACRO_MENU,
     MACRO_AWAITING_INPUT,
     MACRO_COMPLETE
 };
@@ -12,9 +13,9 @@ enum MacroState {
 struct MacroContext {
     MacroState state;
     String functionName;
-    double params[4]; // up to 4 parameters (for now)
+    double params[4];
     uint8_t paramIndex;
-    uint8_t paramCount; // how many params this macro needs
+    uint8_t paramCount;
     double result;
 };
 
@@ -24,6 +25,15 @@ void macroStart(const char* name); // call this when user selects a macro
 bool macroInput(double value); // call this when user hits enter with a number returns true if macro is complete and result is ready
 void macroCancel();
 const char* macroGetPrompt(); // prompt text for current param
+
+// menu
+extern const char* MACRO_NAMES[];
+extern const uint8_t MACRO_COUNT;
+extern uint8_t menuIndex;
+void macroMenuOpen();
+void macroMenuUp();
+void macroMenuDown();
+void macroMenuSelect();
 
 // MACRO LIST
 void macroTaxAdd();       // add tax: amount * (1 + rate)

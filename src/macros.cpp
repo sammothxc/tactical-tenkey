@@ -2,7 +2,17 @@
 
 MacroContext macro = {MACRO_IDLE, "", {0}, 0, 0, 0};
 
-// param prompts per macro
+const char* MACRO_NAMES[] = {
+    "TAX+",
+    "TAX-",
+    "PCT",
+    "MRKUP",
+    "DISC",
+    "CMPND"
+};
+const uint8_t MACRO_COUNT = 6;
+uint8_t menuIndex = 0;
+
 const char* PROMPTS_TAX_ADD[] = {"Amount?", "Tax %?"};
 const char* PROMPTS_TAX_SUB[] = {"Total?", "Tax %?"};
 const char* PROMPTS_PERCENT[] = {"Amount?", "Percent?"};
@@ -11,6 +21,26 @@ const char* PROMPTS_DISCOUNT[] = {"Price?", "Discount %?"};
 const char* PROMPTS_COMPOUND[] = {"Principal?", "Rate %?", "Periods?"};
 
 const char** currentPrompts = nullptr;
+
+void macroMenuOpen() {
+    macro.state = MACRO_MENU;
+}
+
+void macroMenuUp() {
+    if (menuIndex > 0) menuIndex--;
+    else menuIndex = MACRO_COUNT - 1;  // wrap
+}
+
+void macroMenuDown() {
+    if (menuIndex < MACRO_COUNT - 1) menuIndex++;
+    else menuIndex = 0;  // wrap
+}
+
+void macroMenuSelect() {
+    if (macro.state == MACRO_MENU) {
+        macroStart(MACRO_NAMES[menuIndex]);
+    }
+}
 
 void macroStart(const char* name) {
     macro.functionName = name;
@@ -50,7 +80,6 @@ bool macroInput(double value) {
     macro.params[macro.paramIndex++] = value;
     
     if (macro.paramIndex >= macro.paramCount) {
-        // all params collected, calculate
         if (macro.functionName == "TAX+") {
             macro.result = macro.params[0] * (1 + macro.params[1] / 100);
         }
