@@ -202,30 +202,44 @@ void drawTopBar() {
 }
 
 
-void drawBottomBar() {
+vovoid drawBottomBar() {
     u8g2.setFont(u8g2_font_5x7_tr);
     
-    // left: function name or mode
-    if (functionName.length() > 0) {
-        u8g2.drawStr(0, 64, functionName.c_str());
-    } else {
-        u8g2.drawStr(0, 64, numpadMode ? "NUM" : "CALC");
-    }
-    
-    // right: status icons
+    int16_t iconY = 53;  // 64 - 11 = 53
     int16_t iconX = 128;
     
-    if (lowBattery) {
-        iconX -= 18;
-        u8g2.drawStr(iconX, 64, "LOW");
+    // rightmost: BLE or USB or blank
+    if (bleConnected) {
+        iconX -= ICON_WIDTH;
+        u8g2.drawXBM(iconX, iconY, ICON_WIDTH, ICON_HEIGHT, ICON_BLE);
+    } else if (usbConnected) {
+        iconX -= ICON_WIDTH;
+        u8g2.drawXBM(iconX, iconY, ICON_WIDTH, ICON_HEIGHT, ICON_USB);
+    } else {
+        iconX -= ICON_WIDTH;  // blank space
     }
     
-    if (bleConnected) {
-        iconX -= 12;
-        u8g2.drawStr(iconX, 64, "BT");
-    } else if (usbConnected) {
-        iconX -= 18;
-        u8g2.drawStr(iconX, 64, "USB");
+    // numpad mode or blank
+    iconX -= 2;  // spacing
+    if (numpadMode) {
+        iconX -= ICON_WIDTH;
+        u8g2.drawXBM(iconX, iconY, ICON_WIDTH, ICON_HEIGHT, ICON_NUMPAD);
+    } else {
+        iconX -= ICON_WIDTH;  // blank
+    }
+    
+    // battery low or blank
+    iconX -= 2;
+    if (lowBattery) {
+        iconX -= ICON_WIDTH;
+        u8g2.drawXBM(iconX, iconY, ICON_WIDTH, ICON_HEIGHT, ICON_LOWBATT);
+    } else {
+        iconX -= ICON_WIDTH;  // blank
+    }
+    
+    // leftmost: function name
+    if (functionName.length() > 0) {
+        u8g2.drawStr(0, 64, functionName.c_str());
     }
 }
 
