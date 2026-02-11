@@ -9,17 +9,6 @@
 const uint8_t ROW_PINS[4] = {1, 2, 21, 16};
 const uint8_t COL_PINS[4] = {18, 20, 19, 17};
 
-/*
-Physical Layout:
-
-[ C ][ / ][ * ][ - ]
-[ 7 ][ 8 ][ 9 ][ + ]
-[ 4 ][ 5 ][ 6 ][ _ ]
-[ 1 ][ 2 ][ 3 ][ = ]
-[   0    ][ . ][ _ ]
-
-*/
-
 const char KEYMAP[4][4] = {
     {'C', '/', '*', '-'},
     {'7', '8', '9', '+'},
@@ -27,9 +16,9 @@ const char KEYMAP[4][4] = {
     {'1', '2', '3', '0'}
 };
 
-const char WAKE_KEY = '='; // Enter key
+const char WAKE_KEY = '=';
 
-#define SLEEP_TIMEOUT 60000 // 1 min
+#define SLEEP_TIMEOUT 60000
 
 U8G2_SSD1309_128X64_NONAME0_F_HW_I2C u8g2(U8G2_R0, U8X8_PIN_NONE);
 
@@ -45,6 +34,10 @@ bool lowBattery = false;
 bool numpadMode = false;
 String functionName = "";
 
+// combo tracking
+bool minusHeld = false;
+bool zeroHeld = false;
+
 void initMatrix();
 char scanMatrix();
 char scanWakeKey();
@@ -53,6 +46,7 @@ void drawTopBar();
 void drawBottomBar();
 void drawMainDisplay();
 void updateDisplay();
+String formatResult(double result);
 double calculate(double a, double b, char op);
 void goToSleep();
 
@@ -69,19 +63,41 @@ void initMatrix() {
 
 
 char scanMatrix() {
+    char pressed = 0;
+    bool currentMinus = false;
+    bool currentZero = false;
+    
     for (int row = 0; row < 4; row++) {
         digitalWrite(ROW_PINS[row], LOW);
         delayMicroseconds(10);
         
         for (int col = 0; col < 4; col++) {
             if (digitalRead(COL_PINS[col]) == LOW) {
-                digitalWrite(ROW_PINS[row], HIGH);
-                return KEYMAP[row][col];
+                char key = KEYMAP[row][col];
+                if (key == '-') currentMinus = true;
+                else if (key == '0') currentZero = true;
+                else pressed = key;
             }
         }
         digitalWrite(ROW_PINS[row], HIGH);
     }
-    return 0;
+    
+    // check for FN combo
+    if (currentMinus && currentZero) {
+        minusHeld = true;
+        zeroHeld = true;
+        return 'F';
+    }
+    
+    // return individual key if no combo
+    if (currentMinus && !zeroHeld) return '-';
+    if (currentZero && !minusHeld) return '0';
+    
+    // reset hold states when released
+    if (!currentMinus) minusHeld = false;
+    if (!currentZero) zeroHeld = false;
+    
+    return pressed;
 }
 
 
@@ -93,8 +109,28 @@ char scanWakeKey() {
 }
 
 
+String formatResult(double result) {
+    String out = String(result, 6);
+    while (out.endsWith("0") && out.indexOf('.') != -1) {
+        out.remove(out.length() - 1);
+    }
+    if (out.endsWith(".")) {
+        out.remove(out.length() - 1);
+    }
+    return out;
+}
+
+
 void handleKey(char key) {
     lastActivity = millis();
+    
+    // FN combo: quick exit to normal calc mode
+    if (key == 'F') {
+        functionName = "";
+        numpadMode = false;
+        updateDisplay();
+        return;
+    }
     
     if (key >= '0' && key <= '9') {
         if (newEntry) {
@@ -119,14 +155,7 @@ void handleKey(char key) {
             double a = storedValue.toDouble();
             double b = displayValue.toDouble();
             double result = calculate(a, b, pendingOp);
-            displayValue = String(result, 6);
-            // trim trailing zeros
-            while (displayValue.endsWith("0") && displayValue.indexOf('.') != -1) {
-                displayValue.remove(displayValue.length() - 1);
-            }
-            if (displayValue.endsWith(".")) {
-                displayValue.remove(displayValue.length() - 1);
-            }
+            displayValue = formatResult(result);
         }
         storedValue = displayValue;
         pendingOp = key;
@@ -137,24 +166,26 @@ void handleKey(char key) {
             double a = storedValue.toDouble();
             double b = displayValue.toDouble();
             double result = calculate(a, b, pendingOp);
-            displayValue = String(result, 6);
-            // trim trailing zeros
-            while (displayValue.endsWith("0") && displayValue.indexOf('.') != -1) {
-                displayValue.remove(displayValue.length() - 1);
-            }
-            if (displayValue.endsWith(".")) {
-                displayValue.remove(displayValue.length() - 1);
-            }
+            displayValue = formatResult(result);
             storedValue = "";
             pendingOp = 0;
             newEntry = true;
         }
     }
     else if (key == 'C') {
-        displayValue = "0";
-        storedValue = "";
-        pendingOp = 0;
-        newEntry = true;
+        // progressive clear
+        if (displayValue != "0" && !newEntry) {
+            // first: clear current entry
+            displayValue = "0";
+            newEntry = true;
+        } else if (storedValue.length() > 0 || pendingOp) {
+            // second: clear operation
+            storedValue = "";
+            pendingOp = 0;
+        } else if (functionName.length() > 0) {
+            // third: clear function
+            functionName = "";
+        }
     }
     
     updateDisplay();
@@ -168,6 +199,7 @@ void drawTopBar() {
         u8g2.drawStr(0, 10, status.c_str());
     }
 }
+
 
 void drawBottomBar() {
     u8g2.setFont(u8g2_font_5x7_tr);
@@ -196,6 +228,7 @@ void drawBottomBar() {
     }
 }
 
+
 void drawMainDisplay() {
     u8g2.setFont(u8g2_font_logisoso32_tn);
     int16_t width = u8g2.getStrWidth(displayValue.c_str());
@@ -218,6 +251,7 @@ void setFunction(const char* name) {
     functionName = name;
     updateDisplay();
 }
+
 
 void clearFunction() {
     functionName = "";
@@ -269,17 +303,15 @@ void loop() {
     char key = scanMatrix();
     if (!key) key = scanWakeKey();
     
-    // debounce: only trigger on new press
     if (key && key != lastKey) {
         Serial.printf("Key: %c\n", key);
         handleKey(key);
     }
     lastKey = key;
     
-    // sleep after timeout
     if (millis() - lastActivity > SLEEP_TIMEOUT) {
         goToSleep();
     }
     
-    delay(20);  // scan rate ~50Hz
+    delay(20);
 }
