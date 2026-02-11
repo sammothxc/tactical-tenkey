@@ -1,3 +1,4 @@
+#define FIRMWARE_VERSION "0.1.0"
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <Wire.h>
