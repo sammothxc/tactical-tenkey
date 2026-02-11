@@ -22,25 +22,30 @@ const char* PROMPTS_COMPOUND[] = {"Principal?", "Rate %?", "Periods?"};
 
 const char** currentPrompts = nullptr;
 
+
 void macroMenuOpen() {
     macro.state = MACRO_MENU;
 }
+
 
 void macroMenuUp() {
     if (menuIndex > 0) menuIndex--;
     else menuIndex = MACRO_COUNT - 1;  // wrap
 }
 
+
 void macroMenuDown() {
     if (menuIndex < MACRO_COUNT - 1) menuIndex++;
     else menuIndex = 0;  // wrap
 }
+
 
 void macroMenuSelect() {
     if (macro.state == MACRO_MENU) {
         macroStart(MACRO_NAMES[menuIndex]);
     }
 }
+
 
 void macroStart(const char* name) {
     macro.functionName = name;
@@ -74,6 +79,7 @@ void macroStart(const char* name) {
     }
 }
 
+
 bool macroInput(double value) {
     if (macro.state != MACRO_AWAITING_INPUT) return false;
     
@@ -106,12 +112,14 @@ bool macroInput(double value) {
     return false;
 }
 
+
 void macroCancel() {
     macro.state = MACRO_IDLE;
     macro.functionName = "";
     macro.paramIndex = 0;
     currentPrompts = nullptr;
 }
+
 
 const char* macroGetPrompt() {
     if (macro.state != MACRO_AWAITING_INPUT || currentPrompts == nullptr) {

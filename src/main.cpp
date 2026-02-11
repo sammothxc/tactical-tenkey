@@ -4,6 +4,7 @@
 #include <Wire.h>
 #include "icons.h"
 #include "macros.h"
+#include "usbhid.h"
 
 #define SDA_PIN 22
 #define SCL_PIN 23
@@ -39,7 +40,9 @@ String functionName = "";
 bool minusHeld = false;
 bool zeroHeld = false;
 bool fnHeld = false;
-bool fnWasUsed = false;  // track if we navigated while holding
+bool fnWasUsed = false; // track if we navigated while holding
+bool fnSlashPressed = false; // for mode toggle
+bool fnClearPressed = false; // for send answer
 
 void initMatrix();
 char scanMatrix();
@@ -72,6 +75,8 @@ char scanMatrix() {
     bool currentZero = false;
     bool currentPlus = false;
     bool currentEquals = false;
+    bool currentSlash = false;
+    bool currentClear = false;
     
     for (int row = 0; row < 4; row++) {
         digitalWrite(ROW_PINS[row], LOW);
@@ -83,6 +88,8 @@ char scanMatrix() {
                 if (key == '-') currentMinus = true;
                 else if (key == '0') currentZero = true;
                 else if (key == '+') currentPlus = true;
+                else if (key == '/') currentSlash = true;
+                else if (key == 'C') currentClear = true;
                 else pressed = key;
             }
         }
@@ -97,12 +104,30 @@ char scanMatrix() {
     // FN combo detection (minus + zero)
     bool fnPressed = currentMinus && currentZero;
     
+    // FN + slash = toggle numpad mode
+    if (fnPressed && currentSlash && !fnSlashPressed) {
+        fnSlashPressed = true;
+        return 'T';  // toggle mode
+    }
+    if (!currentSlash) fnSlashPressed = false;
+    
+    // FN + clear = send answer
+    if (fnPressed && currentClear && !fnClearPressed) {
+        fnClearPressed = true;
+        return 'A';  // send answer
+    }
+    if (!currentClear) fnClearPressed = false;
+    
     // FN just pressed - open menu
     if (fnPressed && !fnHeld) {
         fnHeld = true;
         fnWasUsed = false;
-        macroMenuOpen();
-        return 'M';  // signal menu opened
+        // only open menu if not pressing other combos
+        if (!currentSlash && !currentClear) {
+            macroMenuOpen();
+            return 'M';
+        }
+        return 0;
     }
     
     // FN held - check for navigation
@@ -115,15 +140,19 @@ char scanMatrix() {
             fnWasUsed = true;
             return 'D';  // menu down
         }
-        return 0;  // still holding, no action
+        return 0;
     }
     
     // FN released
     if (!fnPressed && fnHeld) {
         fnHeld = false;
-        if (macro.state == MACRO_MENU) {
+        if (macro.state == MACRO_MENU && fnWasUsed) {
             macroMenuSelect();
-            return 'S';  // signal selection made
+            return 'S';
+        } else if (macro.state == MACRO_MENU) {
+            // released without navigating - cancel menu
+            macroCancel();
+            return 'X';  // cancel
         }
         return 0;
     }
@@ -138,11 +167,12 @@ char scanMatrix() {
         if (currentZero && !minusHeld) return '0';
         if (currentPlus) return '+';
         if (currentEquals) return '=';
+        if (currentSlash) return '/';
+        if (currentClear) return 'C';
     }
     
     return pressed;
 }
-
 
 
 char scanWakeKey() {
@@ -168,6 +198,42 @@ String formatResult(double result) {
 void handleKey(char key) {
     lastActivity = millis();
     
+    // toggle numpad/calc mode
+    if (key == 'T') {
+        numpadMode = !numpadMode;
+        if (numpadMode) {
+            hidInit();
+            functionName = "";
+            displayValue = "0";
+            storedValue = "";
+            pendingOp = 0;
+            newEntry = true;
+        }
+        updateDisplay();
+        return;
+    }
+    
+    // send answer to computer
+    if (key == 'A') {
+        hidInit();
+        hidSendString(displayValue);
+        // brief visual feedback
+        String temp = displayValue;
+        displayValue = "SENT";
+        updateDisplay();
+        delay(300);
+        displayValue = temp;
+        updateDisplay();
+        return;
+    }
+    
+    // cancel menu
+    if (key == 'X') {
+        macro.state = MACRO_IDLE;
+        updateDisplay();
+        return;
+    }
+    
     // menu controls
     if (key == 'M') {
         drawMacroMenu();
@@ -184,7 +250,6 @@ void handleKey(char key) {
         return;
     }
     if (key == 'S') {
-        // macro selected, set up display
         functionName = macro.functionName;
         displayValue = "0";
         newEntry = true;
@@ -197,6 +262,38 @@ void handleKey(char key) {
         macroCancel();
         functionName = "";
         numpadMode = false;
+        updateDisplay();
+        return;
+    }
+    
+    // NUMPAD MODE - send keys to computer
+    if (numpadMode) {
+        hidSendKey(key);
+        // still show on display for feedback
+        if (key >= '0' && key <= '9') {
+            if (newEntry) {
+                displayValue = key;
+                newEntry = false;
+            } else if (displayValue.length() < 10) {
+                displayValue += key;
+            }
+        }
+        else if (key == '.') {
+            if (newEntry) {
+                displayValue = "0.";
+                newEntry = false;
+            } else if (displayValue.indexOf('.') == -1) {
+                displayValue += '.';
+            }
+        }
+        else if (key == '=' || key == 'C') {
+            displayValue = "0";
+            newEntry = true;
+        }
+        else if (key == '+' || key == '-' || key == '*' || key == '/') {
+            displayValue = "0";
+            newEntry = true;
+        }
         updateDisplay();
         return;
     }
