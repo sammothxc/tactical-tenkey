@@ -39,11 +39,19 @@ char pendingOp = 0;
 bool newEntry = true;
 uint32_t lastActivity = 0;
 char lastKey = 0;
+bool bleConnected = false;
+bool usbConnected = true;
+bool lowBattery = false;
+bool numpadMode = false;
+String functionName = "";
 
 void initMatrix();
 char scanMatrix();
 char scanWakeKey();
 void handleKey(char key);
+void drawTopBar();
+void drawBottomBar();
+void drawMainDisplay();
 void updateDisplay();
 double calculate(double a, double b, char op);
 void goToSleep();
@@ -153,26 +161,67 @@ void handleKey(char key) {
 }
 
 
-void updateDisplay() {
-    u8g2.clearBuffer();
-    
-    // small status line
+void drawTopBar() {
     u8g2.setFont(u8g2_font_6x10_tr);
     if (storedValue.length() > 0 && pendingOp) {
         String status = storedValue + " " + pendingOp;
         u8g2.drawStr(0, 10, status.c_str());
     }
+}
+
+void drawBottomBar() {
+    u8g2.setFont(u8g2_font_5x7_tr);
     
-    // main number display
+    // left: function name or mode
+    if (functionName.length() > 0) {
+        u8g2.drawStr(0, 64, functionName.c_str());
+    } else {
+        u8g2.drawStr(0, 64, numpadMode ? "NUM" : "CALC");
+    }
+    
+    // right: status icons
+    int16_t iconX = 128;
+    
+    if (lowBattery) {
+        iconX -= 18;
+        u8g2.drawStr(iconX, 64, "LOW");
+    }
+    
+    if (bleConnected) {
+        iconX -= 12;
+        u8g2.drawStr(iconX, 64, "BT");
+    } else if (usbConnected) {
+        iconX -= 18;
+        u8g2.drawStr(iconX, 64, "USB");
+    }
+}
+
+void drawMainDisplay() {
     u8g2.setFont(u8g2_font_logisoso32_tn);
-    
-    // right-align the number
     int16_t width = u8g2.getStrWidth(displayValue.c_str());
     int16_t x = 128 - width - 2;
     if (x < 0) x = 0;
-    
-    u8g2.drawStr(x, 55, displayValue.c_str());
+    u8g2.drawStr(x, 50, displayValue.c_str());
+}
+
+
+void updateDisplay() {
+    u8g2.clearBuffer();
+    drawTopBar();
+    drawMainDisplay();
+    drawBottomBar();
     u8g2.sendBuffer();
+}
+
+
+void setFunction(const char* name) {
+    functionName = name;
+    updateDisplay();
+}
+
+void clearFunction() {
+    functionName = "";
+    updateDisplay();
 }
 
 
