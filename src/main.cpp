@@ -73,8 +73,9 @@ char scanMatrix() {
     char pressed = 0;
     bool currentMinus = false;
     bool currentZero = false;
-    bool currentPlus = false;
-    bool currentEquals = false;
+    bool currentEight = false;
+    bool currentTwo = false;
+    bool currentFive = false;
     bool currentSlash = false;
     bool currentClear = false;
     
@@ -87,7 +88,9 @@ char scanMatrix() {
                 char key = KEYMAP[row][col];
                 if (key == '-') currentMinus = true;
                 else if (key == '0') currentZero = true;
-                else if (key == '+') currentPlus = true;
+                else if (key == '8') currentEight = true;
+                else if (key == '2') currentTwo = true;
+                else if (key == '5') currentFive = true;
                 else if (key == '/') currentSlash = true;
                 else if (key == 'C') currentClear = true;
                 else pressed = key;
@@ -96,63 +99,52 @@ char scanMatrix() {
         digitalWrite(ROW_PINS[row], HIGH);
     }
     
-    // check wake key for '='
-    if (digitalRead(WAKE_PIN) == LOW) {
-        currentEquals = true;
-    }
-    
-    // FN combo detection (minus + zero)
     bool fnPressed = currentMinus && currentZero;
     
     // FN + slash = toggle numpad mode
     if (fnPressed && currentSlash && !fnSlashPressed) {
         fnSlashPressed = true;
-        return 'T';  // toggle mode
+        return 'T';
     }
     if (!currentSlash) fnSlashPressed = false;
     
     // FN + clear = send answer
     if (fnPressed && currentClear && !fnClearPressed) {
         fnClearPressed = true;
-        return 'A';  // send answer
+        return 'A';
     }
     if (!currentClear) fnClearPressed = false;
     
-    // FN just pressed - open menu
-    if (fnPressed && !fnHeld) {
+    // FN + 5 = open menu
+    static bool fnFivePressed = false;
+    if (fnPressed && currentFive && !fnFivePressed) {
+        fnFivePressed = true;
         fnHeld = true;
         fnWasUsed = false;
-        // only open menu if not pressing other combos
-        if (!currentSlash && !currentClear) {
-            macroMenuOpen();
-            return 'M';
-        }
-        return 0;
+        macroMenuOpen();
+        return 'M';
     }
+    if (!currentFive) fnFivePressed = false;
     
-    // FN held - check for navigation
+    // FN held (after menu opened) - check for navigation
     if (fnPressed && fnHeld) {
-        if (currentPlus) {
+        if (currentEight) {
             fnWasUsed = true;
-            return 'U';  // menu up
+            return 'U';
         }
-        if (currentEquals) {
+        if (currentTwo) {
             fnWasUsed = true;
-            return 'D';  // menu down
+            return 'D';
         }
         return 0;
     }
     
-    // FN released
+    // FN released while menu open
     if (!fnPressed && fnHeld) {
         fnHeld = false;
-        if (macro.state == MACRO_MENU && fnWasUsed) {
+        if (macro.state == MACRO_MENU) {
             macroMenuSelect();
             return 'S';
-        } else if (macro.state == MACRO_MENU) {
-            // released without navigating - cancel menu
-            macroCancel();
-            return 'X';  // cancel
         }
         return 0;
     }
@@ -165,8 +157,9 @@ char scanMatrix() {
     if (!fnHeld) {
         if (currentMinus && !zeroHeld) return '-';
         if (currentZero && !minusHeld) return '0';
-        if (currentPlus) return '+';
-        if (currentEquals) return '=';
+        if (currentEight) return '8';
+        if (currentTwo) return '2';
+        if (currentFive) return '5';
         if (currentSlash) return '/';
         if (currentClear) return 'C';
     }
@@ -408,12 +401,11 @@ void drawMacroMenu() {
             u8g2.drawStr(4, y, MACRO_NAMES[idx]);
         }
     }
-    
     u8g2.setFont(u8g2_font_5x7_tr);
-    u8g2.drawStr(0, 64, "[+] Up  [=] Down");
-    
+    u8g2.drawStr(0, 64, "[8] Up  [2] Down [Release FN] Select");
     u8g2.sendBuffer();
 }
+
 
 void drawTopBar() {
     u8g2.setFont(u8g2_font_6x10_tr);
