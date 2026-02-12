@@ -7,8 +7,8 @@
 #include "usbhid.h"
 #include "driver/rtc_io.h"
 
-#define SDA_PIN 22
-#define SCL_PIN 23
+#define SDA_PIN 6 // 22
+#define SCL_PIN 7 // 23
 #define WAKE_PIN 0  // Enter key
 #define SLEEP_TIMEOUT 60000
 
