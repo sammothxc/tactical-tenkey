@@ -5,6 +5,7 @@
 #include "icons.h"
 #include "macros.h"
 #include "usbhid.h"
+#include "driver/rtc_io.h"
 
 #define SDA_PIN 22
 #define SCL_PIN 23
@@ -49,12 +50,15 @@ char scanMatrix();
 char scanWakeKey();
 void handleKey(char key);
 void showBootScreen();
+void drawMacroMenu();
 void drawTopBar();
 void drawBottomBar();
 void drawMainDisplay();
 void updateDisplay();
-String formatResult(double result);
+void setFunction(const char* name);
+void clearFunction();
 double calculate(double a, double b, char op);
+String formatResult(double result);
 void goToSleep();
 
 
@@ -173,18 +177,6 @@ char scanWakeKey() {
         return WAKE_KEY;
     }
     return 0;
-}
-
-
-String formatResult(double result) {
-    String out = String(result, 6);
-    while (out.endsWith("0") && out.indexOf('.') != -1) {
-        out.remove(out.length() - 1);
-    }
-    if (out.endsWith(".")) {
-        out.remove(out.length() - 1);
-    }
-    return out;
 }
 
 
@@ -503,6 +495,18 @@ double calculate(double a, double b, char op) {
 }
 
 
+String formatResult(double result) {
+    String out = String(result, 6);
+    while (out.endsWith("0") && out.indexOf('.') != -1) {
+        out.remove(out.length() - 1);
+    }
+    if (out.endsWith(".")) {
+        out.remove(out.length() - 1);
+    }
+    return out;
+}
+
+
 void goToSleep() {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_6x10_tr);
@@ -510,9 +514,10 @@ void goToSleep() {
     u8g2.sendBuffer();
     delay(500);
     u8g2.setPowerSave(1);
-    esp_deep_sleep_enable_gpio_wakeup(1ULL << WAKE_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+    esp_sleep_enable_ext0_wakeup((gpio_num_t)WAKE_PIN, 0); // wake on LOW
     esp_deep_sleep_start();
 }
+
 
 
 void setup() {
