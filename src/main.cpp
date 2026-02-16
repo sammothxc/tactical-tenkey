@@ -9,7 +9,7 @@
 #include "driver/rtc_io.h"
 
 #define SDA_PIN 5
-#define LED_PIN 42 // ??, disable LED when I figure out which one it is
+#define LED_PIN 21
 #define SCL_PIN 6
 #define WAKE_PIN 1  // Enter key
 #define SLEEP_TIMEOUT 60000
@@ -534,6 +534,8 @@ void goToSleep() {
 
 void setup() {
     pinMode(WAKE_PIN, INPUT_PULLUP);
+    pinMode(LED_PIN, OUTPUT);
+    digitalWrite(LED_PIN, LOW);
     initMatrix();
     Wire.begin(SDA_PIN, SCL_PIN);
     u8g2.begin();
@@ -541,7 +543,7 @@ void setup() {
     esp_sleep_wakeup_cause_t wakeup = esp_sleep_get_wakeup_cause();
     if (wakeup == ESP_SLEEP_WAKEUP_UNDEFINED) {
         showBootScreen();
-        
+
     }
     lastActivity = millis();
     updateDisplay();
