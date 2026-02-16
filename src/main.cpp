@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include <U8g2lib.h>
 #include <Wire.h>
+#include <Preferences.h>
 #include "icons.h"
 #include "macros.h"
 #include "usbhid.h"
@@ -51,6 +52,7 @@ char scanMatrix();
 char scanWakeKey();
 void handleKey(char key);
 void showBootScreen();
+void introMode();
 void drawMacroMenu();
 void drawTopBar();
 void drawBottomBar();
@@ -358,13 +360,22 @@ void handleKey(char key) {
 
 void showBootScreen() {
     u8g2.clearBuffer();
+    u8g2.drawXBM(1, 8, LOGO_WIDTH, LOGO_HEIGHT, LOGO);
     u8g2.setFont(u8g2_font_logisoso16_tr);
-    u8g2.drawStr(30, 25, "Tactical");
-    u8g2.drawStr(30, 45, "Tenkey");
+    u8g2.drawStr(55, 25, "Tactical");
+    u8g2.drawStr(58, 45, "Tenkey");
     u8g2.setFont(u8g2_font_5x7_tr);
-    u8g2.drawStr(40, 64, "v " FW_VERSION);
+    u8g2.drawStr(65, 58, "v " FW_VERSION);
     u8g2.sendBuffer();
-    delay(1000);
+    delay(2000);
+}
+
+
+void introMode() {
+    // placeholder for any future intro animation or mode
+    // currently just shows boot screen and then goes to main display
+    showBootScreen();
+    updateDisplay();
 }
 
 
@@ -530,6 +541,7 @@ void setup() {
     esp_sleep_wakeup_cause_t wakeup = esp_sleep_get_wakeup_cause();
     if (wakeup == ESP_SLEEP_WAKEUP_UNDEFINED) {
         showBootScreen();
+        
     }
     lastActivity = millis();
     updateDisplay();
