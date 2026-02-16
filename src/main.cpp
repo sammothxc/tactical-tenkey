@@ -7,13 +7,13 @@
 #include "usbhid.h"
 #include "driver/rtc_io.h"
 
-#define SDA_PIN 6 // 22
-#define SCL_PIN 7 // 23
-#define WAKE_PIN 0  // Enter key
+#define SDA_PIN 5
+#define SCL_PIN 6
+#define WAKE_PIN 1  // Enter key
 #define SLEEP_TIMEOUT 60000
 
-const uint8_t ROW_PINS[4] = {1, 2, 21, 16};
-const uint8_t COL_PINS[4] = {18, 20, 19, 17};
+const uint8_t ROW_PINS[4] = {2, 3, 4, 43};
+const uint8_t COL_PINS[4] = {9, 8, 7, 44};
 
 const char WAKE_KEY = '=';
 const char KEYMAP[4][4] = {
