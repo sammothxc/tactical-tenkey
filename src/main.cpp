@@ -8,6 +8,7 @@
 #include "driver/rtc_io.h"
 
 #define SDA_PIN 5
+#define LED_PIN 42 // ??, disable LED when I figure out which one it is
 #define SCL_PIN 6
 #define WAKE_PIN 1  // Enter key
 #define SLEEP_TIMEOUT 60000
@@ -358,10 +359,10 @@ void handleKey(char key) {
 void showBootScreen() {
     u8g2.clearBuffer();
     u8g2.setFont(u8g2_font_logisoso16_tr);
-    u8g2.drawStr(10, 25, "Tactical");
-    u8g2.drawStr(10, 45, "Tenkey");
+    u8g2.drawStr(30, 25, "Tactical");
+    u8g2.drawStr(30, 45, "Tenkey");
     u8g2.setFont(u8g2_font_5x7_tr);
-    u8g2.drawStr(100, 64, "v " FW_VERSION);
+    u8g2.drawStr(40, 64, "v " FW_VERSION);
     u8g2.sendBuffer();
     delay(1000);
 }
