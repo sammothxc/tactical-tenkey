@@ -1,5 +1,30 @@
-#define FW_VERSION "0.1.0"
 #include <Arduino.h>
+#include "version.h"
+
+// changelog for this version (shown on major/minor bump)
+const char* CHANGELOG[] = {
+    "v0.1.0 - First Release",
+    "",
+    "* Calculator + numpad mode",
+    "* 6 accounting macros",
+    "* FN key combinations",
+    "* USB HID support",
+    "* Auto sleep/wake",
+};
+const uint8_t CHANGELOG_LINES = 7;
+
+// guide pages (shown on first boot)
+const char* GUIDE_PAGES[][4] = {
+    {"BASIC KEYS", "Numbers + operators", "work like a normal", "calculator. Easy!"},
+    {"FN KEY = [-]+[0]", "Hold both keys", "together to activate", "FN combinations."},
+    {"FN + [5] = Macros", "Opens macro menu.", "FN+[8] Up  FN+[2] Dn", "Release FN = Select"},
+    {"FN + [/] = Numpad", "Toggles USB numpad", "mode. Keys send to", "your computer."},
+    {"FN + [C] = Send", "Sends your answer", "to the computer", "via USB keyboard."},
+    {"AUTO SLEEP", "Sleeps after 60s.", "Press [=] to wake.", ""},
+    {"You're all set!", "Happy calculating!", "", "Press [=] to start"},
+};
+const uint8_t GUIDE_PAGE_COUNT = 7;
+
 #include <U8g2lib.h>
 #include <Wire.h>
 #include <Preferences.h>
@@ -63,6 +88,9 @@ void clearFunction();
 double calculate(double a, double b, char op);
 String formatResult(double result);
 void goToSleep();
+void showGuide();
+void showChangelog();
+bool waitForEnter();
 
 
 void initMatrix() {
@@ -360,22 +388,21 @@ void handleKey(char key) {
 
 void showBootScreen() {
     u8g2.clearBuffer();
-    u8g2.drawXBM(1, 8, LOGO_WIDTH, LOGO_HEIGHT, LOGO);
+    u8g2.drawXBM(1, 1, LOGO_WIDTH, LOGO_HEIGHT, LOGO);
     u8g2.setFont(u8g2_font_logisoso16_tr);
-    u8g2.drawStr(55, 25, "Tactical");
-    u8g2.drawStr(58, 45, "Tenkey");
+    u8g2.drawStr(55, 17, "Tactical");
+    u8g2.drawStr(59, 37, "Tenkey");
     u8g2.setFont(u8g2_font_5x7_tr);
-    u8g2.drawStr(65, 58, "v " FW_VERSION);
+    u8g2.drawStr(68, 50, "v " FW_VERSION);
     u8g2.sendBuffer();
     delay(2000);
 }
 
 
-void introMode() {
-    // placeholder for any future intro animation or mode
-    // currently just shows boot screen and then goes to main display
-    showBootScreen();
-    updateDisplay();
+void welcomeText() {
+    u8g2.drawStr(10, 64, "Press [Enter] to start");
+    u8g2.sendBuffer();
+    waitForEnter();
 }
 
 
@@ -531,6 +558,64 @@ void goToSleep() {
 }
 
 
+bool waitForEnter() {
+    // wait for enter key press (with debounce)
+    while (true) {
+        if (digitalRead(WAKE_PIN) == LOW) {
+            delay(200);  // debounce
+            while (digitalRead(WAKE_PIN) == LOW) delay(10);  // wait release
+            return true;
+        }
+        delay(20);
+    }
+}
+
+
+void showGuide() {
+    for (uint8_t page = 0; page < GUIDE_PAGE_COUNT; page++) {
+        u8g2.clearBuffer();
+        u8g2.setFont(u8g2_font_6x10_tr);
+        for (int line = 0; line < 4; line++) {
+            if (strlen(GUIDE_PAGES[page][line]) > 0) {
+                u8g2.drawStr(0, 14 + (line * 14), GUIDE_PAGES[page][line]);
+            }
+        }
+        // progress dots at bottom
+        u8g2.setFont(u8g2_font_5x7_tr);
+        int dotsWidth = GUIDE_PAGE_COUNT * 6;
+        int dotsX = (128 - dotsWidth) / 2;
+        for (int i = 0; i < GUIDE_PAGE_COUNT; i++) {
+            if (i == page) {
+                u8g2.drawDisc(dotsX + (i * 6) + 2, 62, 2);
+            } else {
+                u8g2.drawCircle(dotsX + (i * 6) + 2, 62, 2);
+            }
+        }
+        u8g2.sendBuffer();
+        lastActivity = millis();
+        waitForEnter();
+    }
+}
+
+
+void showChangelog() {
+    u8g2.clearBuffer();
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr(0, 10, "What's New:");
+    u8g2.drawHLine(0, 12, 128);
+    
+    u8g2.setFont(u8g2_font_5x7_tr);
+    for (int i = 0; i < CHANGELOG_LINES && i < 6; i++) {
+        u8g2.drawStr(0, 24 + (i * 8), CHANGELOG[i]);
+    }
+    
+    u8g2.drawStr(30, 64, "[=] Continue");
+    u8g2.sendBuffer();
+    lastActivity = millis();
+    waitForEnter();
+}
+
+
 
 void setup() {
     pinMode(WAKE_PIN, INPUT_PULLUP);
@@ -542,8 +627,27 @@ void setup() {
     u8g2.setContrast(255);
     esp_sleep_wakeup_cause_t wakeup = esp_sleep_get_wakeup_cause();
     if (wakeup == ESP_SLEEP_WAKEUP_UNDEFINED) {
-        showBootScreen();
-
+        Preferences prefs;
+        prefs.begin("t2", false);
+        
+        bool firstBoot = prefs.getBool("guided", false) == false;
+        String lastRelease = prefs.getString("fwRel", "");
+        
+        if (firstBoot) {
+            showBootScreen();
+            welcomeText();
+            showGuide();
+            prefs.putBool("guided", true);
+            prefs.putString("fwRel", FW_RELEASE);
+        } else if (lastRelease != FW_RELEASE) {
+            showBootScreen();
+            showChangelog();
+            prefs.putString("fwRel", FW_RELEASE);
+        } else {
+            showBootScreen();
+        }
+        
+        prefs.end();
     }
     lastActivity = millis();
     updateDisplay();
