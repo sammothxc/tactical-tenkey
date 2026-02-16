@@ -620,7 +620,7 @@ void showChangelog() {
 void setup() {
     pinMode(WAKE_PIN, INPUT_PULLUP);
     pinMode(LED_PIN, OUTPUT);
-    digitalWrite(LED_PIN, LOW);
+    digitalWrite(LED_PIN, HIGH);
     initMatrix();
     Wire.begin(SDA_PIN, SCL_PIN);
     u8g2.begin();
