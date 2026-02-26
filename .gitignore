@@ -1,6 +1,9 @@
 .pio
 .vscode
 
+*kleplace.log
+*.FCBak
+
 # Temporary files
 *.000
 *.bak
