@@ -4064,7 +4064,7 @@
 	(footprint "ScottoKeebs_Components:Diode_DO-35"
 		(layer "F.Cu")
 		(uuid "273f08a5-c9eb-43f8-bf59-84a6415b4fe4")
-		(at 131.8475 65.395)
+		(at 130.41875 65.395)
 		(descr "Diode, DO-35_SOD27 series, Axial, Horizontal, pin pitch=7.62mm, , length*diameter=4*2mm^2, , http://www.diodes.com/_files/packages/DO-35.pdf")
 		(tags "Diode DO-35_SOD27 series Axial Horizontal pin pitch 7.62mm  length 4mm diameter 2mm")
 		(property "Reference" "D4"
@@ -5708,7 +5708,7 @@
 	(footprint "ScottoKeebs_Components:Diode_DO-35"
 		(layer "F.Cu")
 		(uuid "3632f36f-c5f1-471e-beca-9bd9346e8a9e")
-		(at 74.6975 65.395)
+		(at 78.03125 65.395)
 		(descr "Diode, DO-35_SOD27 series, Axial, Horizontal, pin pitch=7.62mm, , length*diameter=4*2mm^2, , http://www.diodes.com/_files/packages/DO-35.pdf")
 		(tags "Diode DO-35_SOD27 series Axial Horizontal pin pitch 7.62mm  length 4mm diameter 2mm")
 		(property "Reference" "D1"
@@ -9634,7 +9634,7 @@
 	(footprint "FS8205A:SOP65P640X120-8N"
 		(layer "F.Cu")
 		(uuid "7dea7708-6b31-43e8-afb1-984a4554e681")
-		(at 132.935 57.395 90)
+		(at 130.035 57.595 90)
 		(property "Reference" "Q1"
 			(at 4.7625 0 180)
 			(layer "F.SilkS")
@@ -10048,7 +10048,7 @@
 	(footprint "xiao:XIAO-ESP32-S3-SMD_PAD"
 		(layer "F.Cu")
 		(uuid "7f381a60-7bad-49ff-aeff-06796f747cab")
-		(at 91.435 59.405 90)
+		(at 91.435 57.595 90)
 		(property "Reference" "U1"
 			(at -2.2 -19.136 90)
 			(layer "F.SilkS")
@@ -45000,7 +45000,7 @@
 	(footprint "Capacitor_THT:CP_Radial_Tantal_D4.5mm_P5.00mm"
 		(layer "F.Cu")
 		(uuid "fef260f7-524f-41db-b9bf-46191d471ea6")
-		(at 140.935 56.895 -90)
+		(at 136.235 56.295 -90)
 		(descr "CP, Radial_Tantal series, Radial, pin pitch=5.00mm, diameter=4.5mm, height=10mm, Tantal Electrolytic Capacitor, http://cdn-reichelt.de/documents/datenblatt/B300/TANTAL-TB-Serie%23.pdf")
 		(tags "CP Radial_Tantal series Radial pin pitch 5.00mm diameter 4.5mm height 10mm Tantal Electrolytic Capacitor")
 		(property "Reference" "C1"
@@ -45173,6 +45173,61 @@
 		)
 	)
 	(gr_rect
+		(start 69.935 63.395)
+		(end 73.935 65.395)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill no)
+		(layer "Eco1.User")
+		(uuid "1c33a17a-06dc-4c83-87b3-16f9f0d1ec79")
+	)
+	(gr_rect
+		(start 142.135 63.395)
+		(end 146.135 65.395)
+		(stroke
+			(width 0.1)
+			(type default)
+		)
+		(fill no)
+		(layer "Eco1.User")
+		(uuid "99a17f47-6a3f-4208-97b0-dbefa6c8e039")
+	)
+	(gr_circle
+		(center 127.085 122.545)
+		(end 129.735 122.545)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "Edge.Cuts")
+		(uuid "1ca1b8ca-a661-4eed-99f2-008cedc0b870")
+	)
+	(gr_circle
+		(center 142.135 63.395)
+		(end 142.135 66.045)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "Edge.Cuts")
+		(uuid "3c99fc71-8443-4d72-b4d3-ef441da1cbbb")
+	)
+	(gr_circle
+		(center 88.985 103.495)
+		(end 91.635 103.495)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "Edge.Cuts")
+		(uuid "4a1593be-6cb2-40f4-b3cc-85b8e99af840")
+	)
+	(gr_rect
 		(start 69.935 38.645)
 		(end 146.135 160.645)
 		(stroke
@@ -45182,6 +45237,28 @@
 		(fill no)
 		(layer "Edge.Cuts")
 		(uuid "7d7b6ef8-5b52-4f61-96ee-a038461106e6")
+	)
+	(gr_circle
+		(center 127.085 84.445)
+		(end 129.735 84.445)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "Edge.Cuts")
+		(uuid "88413061-0460-4dbe-bb07-958565f4840a")
+	)
+	(gr_circle
+		(center 73.935 63.395)
+		(end 73.935 66.045)
+		(stroke
+			(width 0.05)
+			(type default)
+		)
+		(fill no)
+		(layer "Edge.Cuts")
+		(uuid "da05d82a-a4d6-422e-b15e-d171b86e33dd")
 	)
 	(dimension
 		(type orthogonal)
