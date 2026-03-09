@@ -7010,7 +7010,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "xiao:XIAO-ESP32-S3-SMD_PAD"
+		(property "Footprint" "Seeed_Studio_XIAO_Series:XIAO-ESP32-S3-SMD_PAD"
 			(at 176.53 78.74 0)
 			(effects
 				(font
