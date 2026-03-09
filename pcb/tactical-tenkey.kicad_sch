@@ -6940,7 +6940,7 @@
 				)
 			)
 		)
-		(property "Footprint" "ScottoKeebs_Hotswap:Hotswap_MX_Plated_2.00u_90deg"
+		(property "Footprint" "ScottoKeebs_Hotswap:Hotswap_MX_Plated_2.00u"
 			(at 124.46 107.95 0)
 			(effects
 				(font
@@ -8855,7 +8855,7 @@
 				)
 			)
 		)
-		(property "Footprint" "ScottoKeebs_Hotswap:Hotswap_MX_Plated_2.00u_90deg"
+		(property "Footprint" "ScottoKeebs_Hotswap:Hotswap_MX_Plated_2.00u"
 			(at 120.65 82.55 0)
 			(effects
 				(font
