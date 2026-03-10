@@ -1113,7 +1113,7 @@
 			)
 			(embedded_fonts no)
 		)
-		(symbol "FS8205A:FS8205A"
+		(symbol "FS8205:FS8205"
 			(pin_names
 				(offset 1.016)
 			)
@@ -1121,7 +1121,16 @@
 			(in_bom yes)
 			(on_board yes)
 			(property "Reference" "Q"
-				(at -11.43 7.62 0)
+				(at 2.54 2.286 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left top)
+				)
+			)
+			(property "Value" "FS8205"
+				(at 2.54 -2.032 0)
 				(effects
 					(font
 						(size 1.27 1.27)
@@ -1129,16 +1138,7 @@
 					(justify left bottom)
 				)
 			)
-			(property "Value" "FS8205A"
-				(at -11.43 -12.7 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(justify left bottom)
-				)
-			)
-			(property "Footprint" "FS8205A:SOP65P640X120-8N"
+			(property "Footprint" "FS8205:SOT95P280X145-6N"
 				(at 0 0 0)
 				(effects
 					(font
@@ -1176,7 +1176,7 @@
 					(hide yes)
 				)
 			)
-			(property "MAXIMUM_PACKAGE_HEIGHT" "1.2mm"
+			(property "MAXIMUM_PACKAGE_HEIGHT" "1.45mm"
 				(at 0 0 0)
 				(effects
 					(font
@@ -1206,7 +1206,7 @@
 					(hide yes)
 				)
 			)
-			(property "Check_prices" "https://www.snapeda.com/parts/FS8205A/Fortune+Semiconductor/view-part/?ref=eda"
+			(property "Check_prices" "https://www.snapeda.com/parts/FS8205/Fortune+Semiconductor/view-part/?ref=eda"
 				(at 0 0 0)
 				(effects
 					(font
@@ -1216,7 +1216,7 @@
 					(hide yes)
 				)
 			)
-			(property "STANDARD" "IPC 7351B"
+			(property "STANDARD" "IPC-7351B"
 				(at 0 0 0)
 				(effects
 					(font
@@ -1226,7 +1226,7 @@
 					(hide yes)
 				)
 			)
-			(property "PARTREV" "1.7"
+			(property "PARTREV" "1.9"
 				(at 0 0 0)
 				(effects
 					(font
@@ -1236,7 +1236,7 @@
 					(hide yes)
 				)
 			)
-			(property "SnapEDA_Link" "https://www.snapeda.com/parts/FS8205A/Fortune+Semiconductor/view-part/?ref=snap"
+			(property "SnapEDA_Link" "https://www.snapeda.com/parts/FS8205/Fortune+Semiconductor/view-part/?ref=snap"
 				(at 0 0 0)
 				(effects
 					(font
@@ -1246,7 +1246,7 @@
 					(hide yes)
 				)
 			)
-			(property "MP" "FS8205A"
+			(property "MP" "FS8205"
 				(at 0 0 0)
 				(effects
 					(font
@@ -1256,7 +1256,7 @@
 					(hide yes)
 				)
 			)
-			(property "Description_1" ""
+			(property "Description_1" "Dual N-Channel Enhancement Mode Power MOSFET"
 				(at 0 0 0)
 				(effects
 					(font
@@ -1276,7 +1276,7 @@
 					(hide yes)
 				)
 			)
-			(property "MANUFACTURER" "Fortune Semiconductor"
+			(property "MANUFACTURER" "Fortune"
 				(at 0 0 0)
 				(effects
 					(font
@@ -1286,13 +1286,25 @@
 					(hide yes)
 				)
 			)
-			(symbol "FS8205A_0_0"
+			(symbol "FS8205_0_0"
 				(polyline
 					(pts
-						(xy -2.54 7.62) (xy -2.54 2.54)
+						(xy -2.54 2.54) (xy -2.54 7.62)
 					)
 					(stroke
 						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -2.54 0) (xy 0 0)
+					)
+					(stroke
+						(width 0.1524)
 						(type default)
 					)
 					(fill
@@ -1313,7 +1325,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.778 8.255) (xy -1.778 7.62)
+						(xy -1.778 7.62) (xy -1.778 8.255)
 					)
 					(stroke
 						(width 0.254)
@@ -1325,7 +1337,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.778 7.62) (xy -1.778 6.985)
+						(xy -1.778 6.985) (xy -1.778 7.62)
 					)
 					(stroke
 						(width 0.254)
@@ -1337,31 +1349,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.778 7.62) (xy 1.27 7.62)
-					)
-					(stroke
-						(width 0.1524)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.778 5.842) (xy -1.778 5.08)
-					)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -1.778 5.08) (xy -1.778 4.318)
+						(xy -1.778 5.08) (xy -1.778 5.842)
 					)
 					(stroke
 						(width 0.254)
@@ -1385,7 +1373,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.778 3.175) (xy -1.778 2.54)
+						(xy -1.778 4.318) (xy -1.778 5.08)
 					)
 					(stroke
 						(width 0.254)
@@ -1397,7 +1385,31 @@
 				)
 				(polyline
 					(pts
-						(xy -1.778 2.54) (xy -1.778 1.905)
+						(xy -1.778 2.54) (xy -1.778 3.175)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.778 2.54) (xy 0 2.54)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -1.778 1.905) (xy -1.778 2.54)
 					)
 					(stroke
 						(width 0.254)
@@ -1433,7 +1445,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.778 -2.54) (xy 1.27 -2.54)
+						(xy -1.778 -2.54) (xy 0 -2.54)
 					)
 					(stroke
 						(width 0.1524)
@@ -1505,7 +1517,7 @@
 				)
 				(polyline
 					(pts
-						(xy -1.524 5.08) (xy -0.508 5.842) (xy -0.508 4.318) (xy -1.524 5.08)
+						(xy -1.524 5.08) (xy -0.508 4.318) (xy -0.508 5.842) (xy -1.524 5.08)
 					)
 					(stroke
 						(width 0.1524)
@@ -1540,10 +1552,104 @@
 				)
 				(polyline
 					(pts
-						(xy 0 7.62) (xy 0 5.08)
+						(xy 0 7.62) (xy -1.778 7.62)
 					)
 					(stroke
 						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 7.62) (xy 1.27 7.62)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 5.08) (xy 0 7.62)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center 0 2.54)
+					(radius 0.3592)
+					(stroke
+						(width 0)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 2.54) (xy 0 0)
+					)
+					(stroke
+						(width 0.1778)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 2.54) (xy 1.27 2.54)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 0) (xy 0 -2.54)
+					)
+					(stroke
+						(width 0.1778)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 0 -2.54) (xy 1.27 -2.54)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(circle
+					(center 0 -2.54)
+					(radius 0.3592)
+					(stroke
+						(width 0)
 						(type default)
 					)
 					(fill
@@ -1599,7 +1705,7 @@
 				)
 				(polyline
 					(pts
-						(xy 0.762 4.572) (xy 1.27 4.572)
+						(xy 1.27 4.572) (xy 0.762 4.572)
 					)
 					(stroke
 						(width 0.1524)
@@ -1623,19 +1729,7 @@
 				)
 				(polyline
 					(pts
-						(xy 1.27 4.572) (xy 1.778 4.572)
-					)
-					(stroke
-						(width 0.1524)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 4.572) (xy 1.778 5.334) (xy 0.762 5.334) (xy 1.27 4.572)
+						(xy 1.27 4.572) (xy 0.762 5.334) (xy 1.778 5.334) (xy 1.27 4.572)
 					)
 					(stroke
 						(width 0.1524)
@@ -1647,66 +1741,7 @@
 				)
 				(polyline
 					(pts
-						(xy 1.27 2.54) (xy -1.778 2.54)
-					)
-					(stroke
-						(width 0.1524)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
 						(xy 1.27 2.54) (xy 1.27 4.572)
-					)
-					(stroke
-						(width 0.1524)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(circle
-					(center 1.27 2.54)
-					(radius 0.3592)
-					(stroke
-						(width 0)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 0) (xy 1.27 2.54)
-					)
-					(stroke
-						(width 0.1524)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 0) (xy 2.54 0)
-					)
-					(stroke
-						(width 0.1524)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.27 -2.54) (xy 1.27 0)
 					)
 					(stroke
 						(width 0.1524)
@@ -1722,17 +1757,6 @@
 					)
 					(stroke
 						(width 0.1524)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(circle
-					(center 1.27 -2.54)
-					(radius 0.3592)
-					(stroke
-						(width 0)
 						(type default)
 					)
 					(fill
@@ -1777,6 +1801,18 @@
 				)
 				(polyline
 					(pts
+						(xy 1.778 4.572) (xy 1.27 4.572)
+					)
+					(stroke
+						(width 0.1524)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
 						(xy 1.778 -4.572) (xy 1.27 -4.572)
 					)
 					(stroke
@@ -1788,25 +1824,7 @@
 					)
 				)
 				(pin passive line
-					(at -5.08 2.54 0)
-					(length 2.54)
-					(name "~"
-						(effects
-							(font
-								(size 1.016 1.016)
-							)
-						)
-					)
-					(number "5"
-						(effects
-							(font
-								(size 1.016 1.016)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at -5.08 -7.62 0)
+					(at -5.08 5.08 0)
 					(length 2.54)
 					(name "~"
 						(effects
@@ -1824,7 +1842,44 @@
 					)
 				)
 				(pin passive line
-					(at 0 10.16 270)
+					(at -5.08 0 0)
+					(length 2.54)
+					(name "~"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 0 0)
+					(length 2.54)
+					(hide yes)
+					(name "~"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "5"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -5.08 -5.08 0)
 					(length 2.54)
 					(name "~"
 						(effects
@@ -1844,44 +1899,6 @@
 				(pin passive line
 					(at 0 10.16 270)
 					(length 2.54)
-					(hide yes)
-					(name "~"
-						(effects
-							(font
-								(size 1.016 1.016)
-							)
-						)
-					)
-					(number "7"
-						(effects
-							(font
-								(size 1.016 1.016)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 0 -10.16 90)
-					(length 2.54)
-					(name "~"
-						(effects
-							(font
-								(size 1.016 1.016)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.016 1.016)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 0 -10.16 90)
-					(length 2.54)
-					(hide yes)
 					(name "~"
 						(effects
 							(font
@@ -1898,7 +1915,7 @@
 					)
 				)
 				(pin passive line
-					(at 5.08 0 180)
+					(at 0 -10.16 90)
 					(length 2.54)
 					(name "~"
 						(effects
@@ -1908,25 +1925,6 @@
 						)
 					)
 					(number "1"
-						(effects
-							(font
-								(size 1.016 1.016)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at 5.08 0 180)
-					(length 2.54)
-					(hide yes)
-					(name "~"
-						(effects
-							(font
-								(size 1.016 1.016)
-							)
-						)
-					)
-					(number "8"
 						(effects
 							(font
 								(size 1.016 1.016)
@@ -3623,7 +3621,7 @@
 		(uuid "d042add6-d828-4608-86cb-544e14ceae74")
 	)
 	(no_connect
-		(at 114.3 170.18)
+		(at 114.3 160.02)
 		(uuid "d7532b3c-456d-42aa-bb98-90ff8e0c94be")
 	)
 	(no_connect
@@ -3659,16 +3657,6 @@
 			(type default)
 		)
 		(uuid "04a2dee7-f5f4-4f47-903c-3d5a940d5179")
-	)
-	(wire
-		(pts
-			(xy 116.84 160.02) (xy 114.3 160.02)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "08b7d5f5-ae4b-4c34-8a80-dbcc6b55fa85")
 	)
 	(wire
 		(pts
@@ -3809,6 +3797,16 @@
 			(type default)
 		)
 		(uuid "24f440cc-c86d-4506-a261-5ccef5157292")
+	)
+	(wire
+		(pts
+			(xy 114.3 156.21) (xy 119.38 156.21)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "2835cf59-ba0d-4c71-8024-922a9ed3ea39")
 	)
 	(wire
 		(pts
@@ -3979,16 +3977,6 @@
 			(type default)
 		)
 		(uuid "5a8b4f24-f0d2-475d-898f-a2205b3a2214")
-	)
-	(wire
-		(pts
-			(xy 106.68 160.02) (xy 109.22 160.02)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "5bb8342e-caf8-4429-8dd9-e2bc3200b169")
 	)
 	(wire
 		(pts
@@ -4172,16 +4160,6 @@
 	)
 	(wire
 		(pts
-			(xy 114.3 160.02) (xy 114.3 156.21)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9ff9fb11-b690-41be-bfb3-8fbf0a3a5f99")
-	)
-	(wire
-		(pts
 			(xy 124.46 165.1) (xy 124.46 168.91)
 		)
 		(stroke
@@ -4279,6 +4257,16 @@
 			(type default)
 		)
 		(uuid "c04c3359-7db6-4642-b395-06fa19100521")
+	)
+	(wire
+		(pts
+			(xy 119.38 156.21) (xy 119.38 160.02)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "c41050e2-8d6c-4818-aae0-4da4298dada7")
 	)
 	(wire
 		(pts
@@ -6703,215 +6691,6 @@
 		)
 	)
 	(symbol
-		(lib_id "FS8205A:FS8205A")
-		(at 114.3 165.1 270)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "6edf7443-55b2-487a-b2f2-c846cdaf9ac7")
-		(property "Reference" "Q1"
-			(at 117.0687 170.18 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "FS8205A"
-			(at 117.0687 172.72 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "FS8205A:SOP65P640X120-8N"
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "MF" "Fortune Semiconductor"
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "MAXIMUM_PACKAGE_HEIGHT" "1.2mm"
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "Package" "Package"
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "Price" "None"
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "Check_prices" "https://www.snapeda.com/parts/FS8205A/Fortune+Semiconductor/view-part/?ref=eda"
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "STANDARD" "IPC 7351B"
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "PARTREV" "1.7"
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "SnapEDA_Link" "https://www.snapeda.com/parts/FS8205A/Fortune+Semiconductor/view-part/?ref=snap"
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "MP" "FS8205A"
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "Description_1" ""
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "Availability" "In Stock"
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "MANUFACTURER" "Fortune Semiconductor"
-			(at 114.3 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "ef2084ba-7fe3-4e26-9581-904ab9840374")
-		)
-		(pin "3"
-			(uuid "d91e7058-dd55-4adf-b8c1-c5c79e165554")
-		)
-		(pin "8"
-			(uuid "f339cf83-b286-4b73-a5b1-bcaa823546f7")
-		)
-		(pin "5"
-			(uuid "c8394a3e-9ac0-416d-9211-a871abb9d17f")
-		)
-		(pin "7"
-			(uuid "80a3a287-891a-4c0a-9ee3-a3650476643a")
-		)
-		(pin "6"
-			(uuid "350bc2ef-36ee-4954-9e62-ef436098792c")
-		)
-		(pin "4"
-			(uuid "3bf819e9-5b56-4db5-b458-d72f76eb681b")
-		)
-		(pin "2"
-			(uuid "bba10c24-74be-4f1c-9845-1b65d843df4d")
-		)
-		(instances
-			(project ""
-				(path "/0d362948-d01f-4080-aaa1-0ac3b9a8002f"
-					(reference "Q1")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "ScottoKeebs:Placeholder_Keyswitch")
 		(at 124.46 107.95 0)
 		(unit 1)
@@ -7689,6 +7468,206 @@
 			(project "tactical-tenkey"
 				(path "/0d362948-d01f-4080-aaa1-0ac3b9a8002f"
 					(reference "D14")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "FS8205:FS8205")
+		(at 114.3 165.1 270)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "8fd8f5e4-393c-48d8-a470-37361555e894")
+		(property "Reference" "Q2"
+			(at 114.3 168.91 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "FS8205"
+			(at 114.3 171.45 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "FS8205:SOT95P280X145-6N"
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "MF" "Fortune Semiconductor"
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "MAXIMUM_PACKAGE_HEIGHT" "1.45mm"
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Package" "Package"
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Price" "None"
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Check_prices" "https://www.snapeda.com/parts/FS8205/Fortune+Semiconductor/view-part/?ref=eda"
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "STANDARD" "IPC-7351B"
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "PARTREV" "1.9"
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "SnapEDA_Link" "https://www.snapeda.com/parts/FS8205/Fortune+Semiconductor/view-part/?ref=snap"
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "MP" "FS8205"
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Description_1" "Dual N-Channel Enhancement Mode Power MOSFET"
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Availability" "In Stock"
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "MANUFACTURER" "Fortune"
+			(at 114.3 165.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(pin "5"
+			(uuid "0bbfc1f9-d519-4819-a421-a779608dc817")
+		)
+		(pin "2"
+			(uuid "5813d127-f0e5-4bcd-a819-00711a084774")
+		)
+		(pin "1"
+			(uuid "87a64aaf-e5c9-4b80-90f3-4c23124440f0")
+		)
+		(pin "6"
+			(uuid "60b11c61-d3dc-4604-a10c-0f049928dd1f")
+		)
+		(pin "3"
+			(uuid "69375398-3191-42d6-a11a-59450379168e")
+		)
+		(pin "4"
+			(uuid "1c3138fe-723f-4b4f-963d-382aedccea6a")
+		)
+		(instances
+			(project ""
+				(path "/0d362948-d01f-4080-aaa1-0ac3b9a8002f"
+					(reference "Q2")
 					(unit 1)
 				)
 			)
