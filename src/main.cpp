@@ -36,10 +36,10 @@ const uint8_t GUIDE_PAGE_COUNT = 7;
 #define SDA_PIN 5
 #define LED_PIN 21
 #define SCL_PIN 6
-#define WAKE_PIN 1  // Enter key
+#define WAKE_PIN 1 // Enter key
 #define SLEEP_TIMEOUT 60000
 
-const uint8_t ROW_PINS[4] = {2, 3, 4, 43};
+const uint8_t ROW_PINS[4] = {3, 2, 4, 43};
 const uint8_t COL_PINS[4] = {9, 8, 7, 44};
 
 const char WAKE_KEY = '=';
@@ -625,6 +625,7 @@ void setup() {
     Wire.begin(SDA_PIN, SCL_PIN);
     u8g2.begin();
     u8g2.setContrast(255);
+    u8g2.setFlipMode(1); // rotate display 180 degrees
     esp_sleep_wakeup_cause_t wakeup = esp_sleep_get_wakeup_cause();
     if (wakeup == ESP_SLEEP_WAKEUP_UNDEFINED) {
         Preferences prefs;
