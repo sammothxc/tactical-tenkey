@@ -357,6 +357,7 @@ void handleKey(char key) {
         }
         storedValue = displayValue;
         pendingOp = key;
+        displayValue = "";
         newEntry = true;
     }
     else if (key == '=') {
@@ -371,8 +372,8 @@ void handleKey(char key) {
         }
     }
     else if (key == 'C') {
-        if (displayValue != "0" && !newEntry) {
-            displayValue = "0";
+        if (displayValue != "" && !newEntry) {
+            displayValue = "";
             newEntry = true;
         } else if (storedValue.length() > 0 || pendingOp) {
             storedValue = "";
@@ -614,7 +615,6 @@ void showChangelog() {
     lastActivity = millis();
     waitForEnter();
 }
-
 
 
 void setup() {
