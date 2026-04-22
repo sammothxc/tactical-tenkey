@@ -1,0 +1,47 @@
+import datetime, json, os, shutil
+
+Import("env")
+
+# --- PRE-BUILD: version bump ---
+ver_file = "version.json"
+
+if os.path.exists(ver_file):
+    with open(ver_file) as f:
+        ver = json.load(f)
+else:
+    ver = {"major": 0, "minor": 1, "build": 0}
+
+ver["build"] += 1
+
+with open(ver_file, "w") as f:
+    json.dump(ver, f, indent=2)
+
+version = f'{ver["major"]}.{ver["minor"]}.{ver["build"]}'
+release = f'{ver["major"]}.{ver["minor"]}'
+today = str(datetime.date.today())
+
+with open("include/version.h", "w") as f:
+    f.write(f'#define FW_VERSION "{version}"\n')
+    f.write(f'#define FW_RELEASE "{release}"\n')
+    f.write(f'#define FW_DATE "{today}"\n')
+
+fw_json_file = "firmware/firmware.json"
+os.makedirs("firmware", exist_ok=True)
+
+if os.path.exists(fw_json_file):
+    with open(fw_json_file) as f:
+        fw = json.load(f)
+else:
+    fw = {"version": "", "date": "", "notes": ""}
+
+fw["version"] = version
+fw["date"] = today
+
+with open(fw_json_file, "w") as f:
+    json.dump(fw, f, indent=2)
+
+def copy_bin(source, target, env):
+    shutil.copy(str(target[0]), "firmware/firmware.bin")
+    print(f">> Copied firmware to firmware/firmware.bin (v{version})")
+
+env.AddPostAction("$BUILD_DIR/firmware.bin", copy_bin)
