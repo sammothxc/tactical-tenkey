@@ -3503,6 +3503,12 @@
 		(uuid "959e4f67-16d5-48ce-959e-94b5da87bd00")
 	)
 	(junction
+		(at 82.55 144.78)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "9affb74d-8c51-473b-9856-6a5f768ec65f")
+	)
+	(junction
 		(at 97.79 96.52)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -3574,18 +3580,12 @@
 		(color 0 0 0 0)
 		(uuid "f6b3d5e2-8037-424b-9a54-d6f49ecb855d")
 	)
-	(junction
-		(at 93.98 143.51)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "fbc84ab3-0163-4350-a071-770d9909aca2")
-	)
 	(no_connect
 		(at 184.15 60.96)
 		(uuid "00347d38-41fd-4268-b9e5-23beacd94cc9")
 	)
 	(no_connect
-		(at 93.98 148.59)
+		(at 93.98 143.51)
 		(uuid "258b8554-8875-473f-b78e-1df19d965cea")
 	)
 	(no_connect
@@ -3750,6 +3750,16 @@
 	)
 	(wire
 		(pts
+			(xy 93.98 146.05) (xy 82.55 146.05)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "194850cf-af2e-4c70-b5e3-d0ce1291d36c")
+	)
+	(wire
+		(pts
 			(xy 109.22 160.02) (xy 109.22 156.21)
 		)
 		(stroke
@@ -3837,16 +3847,6 @@
 			(type default)
 		)
 		(uuid "30bed9e4-eda8-465e-9188-1f9bb28e07bc")
-	)
-	(wire
-		(pts
-			(xy 81.28 146.05) (xy 81.28 144.78)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "34353b26-1340-41e7-8cc0-da65beb45627")
 	)
 	(wire
 		(pts
@@ -4010,6 +4010,16 @@
 	)
 	(wire
 		(pts
+			(xy 82.55 146.05) (xy 82.55 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "65e98b53-4993-46f6-90b0-c0b30ded34f9")
+	)
+	(wire
+		(pts
 			(xy 177.8 135.89) (xy 177.8 142.24)
 		)
 		(stroke
@@ -4150,7 +4160,7 @@
 	)
 	(wire
 		(pts
-			(xy 81.28 144.78) (xy 78.74 144.78)
+			(xy 82.55 140.97) (xy 83.82 140.97)
 		)
 		(stroke
 			(width 0)
@@ -4240,7 +4250,7 @@
 	)
 	(wire
 		(pts
-			(xy 93.98 140.97) (xy 93.98 143.51)
+			(xy 93.98 137.16) (xy 93.98 138.43)
 		)
 		(stroke
 			(width 0)
@@ -4390,6 +4400,16 @@
 	)
 	(wire
 		(pts
+			(xy 82.55 144.78) (xy 78.74 144.78)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "eb48374e-25b5-4f18-b88e-33dd51b7c65e")
+	)
+	(wire
+		(pts
 			(xy 154.94 90.17) (xy 163.83 90.17)
 		)
 		(stroke
@@ -4410,13 +4430,13 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 146.05) (xy 81.28 146.05)
+			(xy 82.55 140.97) (xy 82.55 144.78)
 		)
 		(stroke
 			(width 0)
 			(type default)
 		)
-		(uuid "f26d8c86-5f4b-4df3-b27c-46897ff74f3c")
+		(uuid "f16240e0-3620-4105-966b-2c17c930f055")
 	)
 	(wire
 		(pts
@@ -4457,16 +4477,6 @@
 			(type default)
 		)
 		(uuid "fb355cf4-9010-4b40-a6a6-8c205dca9fd8")
-	)
-	(wire
-		(pts
-			(xy 93.98 143.51) (xy 93.98 146.05)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "fb4bb199-cd17-47ef-9929-c275de6c2bd6")
 	)
 	(global_label "pwr"
 		(shape input)
@@ -4668,7 +4678,7 @@
 	)
 	(global_label "prot+"
 		(shape input)
-		(at 93.98 140.97 90)
+		(at 93.98 137.16 90)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -4678,7 +4688,7 @@
 		)
 		(uuid "724da469-bd18-43d0-8274-726553e17006")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 93.98 132.6025 90)
+			(at 93.98 128.7925 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5430,10 +5440,9 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "11863161-26f9-4160-8e26-e4b69e986709")
 		(property "Reference" "R3"
-			(at 97.79 139.7 90)
+			(at 97.536 141.986 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5441,7 +5450,7 @@
 			)
 		)
 		(property "Value" "100"
-			(at 97.79 142.24 90)
+			(at 97.536 143.764 90)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5580,7 +5589,7 @@
 			)
 		)
 		(property "Value" "PWR_FLAG"
-			(at 79.248 140.716 0)
+			(at 76.708 140.716 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5916,7 +5925,7 @@
 	)
 	(symbol
 		(lib_id "Switch:SW_SPDT")
-		(at 88.9 146.05 0)
+		(at 88.9 140.97 0)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
@@ -5925,7 +5934,7 @@
 		(fields_autoplaced yes)
 		(uuid "2949767b-bbc4-4a5f-b80b-7c2a7319186f")
 		(property "Reference" "SW1"
-			(at 88.9 137.16 0)
+			(at 88.9 132.08 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5933,7 +5942,7 @@
 			)
 		)
 		(property "Value" "SW_SPDT"
-			(at 88.9 139.7 0)
+			(at 88.9 134.62 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5941,7 +5950,7 @@
 			)
 		)
 		(property "Footprint" "Personal:SS-12F23G5"
-			(at 88.9 146.05 0)
+			(at 88.9 140.97 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5950,7 +5959,7 @@
 			)
 		)
 		(property "Datasheet" "~"
-			(at 88.9 153.67 0)
+			(at 88.9 148.59 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5959,7 +5968,7 @@
 			)
 		)
 		(property "Description" "Switch, single pole double throw"
-			(at 88.9 146.05 0)
+			(at 88.9 140.97 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -8128,7 +8137,7 @@
 			)
 		)
 		(property "Value" "PWR_FLAG"
-			(at 82.042 156.21 0)
+			(at 75.946 156.972 0)
 			(effects
 				(font
 					(size 1.27 1.27)
