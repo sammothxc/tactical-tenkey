@@ -1,0 +1,75 @@
+name: Build Firmware
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ci.ini') }}
+          restore-keys: |
+            pio-${{ runner.os }}-
+
+      - name: Install PlatformIO
+        run: |
+          python -m pip install --upgrade pip
+          pip install platformio
+
+      - name: Use CI build config (no FORCE_FIRST_BOOT)
+        run: cp platformio.ci.ini platformio.ini
+
+      - name: Resolve build version
+        id: ver
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            raw="${GITHUB_REF_NAME#v}"
+          else
+            raw=""
+          fi
+          echo "override=$raw" >> "$GITHUB_OUTPUT"
+
+      - name: Build firmware
+        env:
+          FW_VERSION_OVERRIDE: ${{ steps.ver.outputs.override }}
+        run: pio run -e seeed_xiao_esp32s3
+
+      - name: Read final version
+        id: fw
+        run: |
+          echo "version=$(python -c 'import json; print(json.load(open("firmware/firmware.json"))["version"])')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ steps.fw.outputs.version }}
+          path: |
+            firmware/firmware.bin
+            firmware/firmware.json
+
+      - name: Create GitHub Release
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ steps.fw.outputs.version }}
+          generate_release_notes: true
+          files: |
+            firmware/firmware.bin
+            firmware/firmware.json
