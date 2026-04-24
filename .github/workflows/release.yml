@@ -2,6 +2,8 @@ name: Build Firmware
 
 on:
   push:
+    paths:
+      - 'version.json'
   workflow_dispatch:
 
 permissions:
@@ -42,10 +44,17 @@ jobs:
           if [ "${{ github.ref_type }}" = "tag" ]; then
             raw="${GITHUB_REF_NAME#v}"
           else
-            maj_min=$(python -c 'import json; v=json.load(open("version.json")); print("{}.{}".format(v["major"], v["minor"]))')
-            raw="${maj_min}.${{ github.run_number }}"
+            raw=$(python -c 'import json; v=json.load(open("version.json")); print("{}.{}.{}".format(v["major"], v["minor"], v["build"]))')
           fi
           echo "override=$raw" >> "$GITHUB_OUTPUT"
+
+      - name: Guard against existing tag
+        run: |
+          tag="v${{ steps.ver.outputs.override }}"
+          if git ls-remote --tags --exit-code origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "::error::Tag $tag already exists on origin. Bump version.json before pushing."
+            exit 1
+          fi
 
       - name: Build firmware
         env:
