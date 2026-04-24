@@ -42,7 +42,8 @@ jobs:
           if [ "${{ github.ref_type }}" = "tag" ]; then
             raw="${GITHUB_REF_NAME#v}"
           else
-            raw=""
+            maj_min=$(python -c 'import json; v=json.load(open("version.json")); print(f"{v[\"major\"]}.{v[\"minor\"]}")')
+            raw="${maj_min}.${{ github.run_number }}"
           fi
           echo "override=$raw" >> "$GITHUB_OUTPUT"
 
@@ -65,10 +66,10 @@ jobs:
             firmware/firmware.json
 
       - name: Create GitHub Release
-        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v2
         with:
           name: v${{ steps.fw.outputs.version }}
+          tag_name: v${{ steps.fw.outputs.version }}
           generate_release_notes: true
           files: |
             firmware/firmware.bin
