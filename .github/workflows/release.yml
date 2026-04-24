@@ -61,25 +61,16 @@ jobs:
           FW_VERSION_OVERRIDE: ${{ steps.ver.outputs.override }}
         run: pio run -e seeed_xiao_esp32s3
 
-      - name: Read final version
-        id: fw
-        run: |
-          echo "version=$(python -c 'import json; print(json.load(open("firmware/firmware.json"))["version"])')" >> "$GITHUB_OUTPUT"
-
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: firmware-${{ steps.fw.outputs.version }}
-          path: |
-            firmware/firmware.bin
-            firmware/firmware.json
+          name: firmware-${{ steps.ver.outputs.override }}
+          path: firmware/firmware.bin
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          name: v${{ steps.fw.outputs.version }}
-          tag_name: v${{ steps.fw.outputs.version }}
+          name: v${{ steps.ver.outputs.override }}
+          tag_name: v${{ steps.ver.outputs.override }}
           generate_release_notes: true
-          files: |
-            firmware/firmware.bin
-            firmware/firmware.json
+          files: firmware/firmware.bin

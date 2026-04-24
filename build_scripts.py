@@ -34,20 +34,7 @@ with open("include/version.h", "w") as f:
     f.write(f'#define FW_RELEASE "{release}"\n')
     f.write(f'#define FW_DATE "{today}"\n')
 
-fw_json_file = "firmware/firmware.json"
 os.makedirs("firmware", exist_ok=True)
-
-if os.path.exists(fw_json_file):
-    with open(fw_json_file) as f:
-        fw = json.load(f)
-else:
-    fw = {"version": "", "date": "", "notes": ""}
-
-fw["version"] = version
-fw["date"] = today
-
-with open(fw_json_file, "w") as f:
-    json.dump(fw, f, indent=2)
 
 def copy_bin(source, target, env):
     shutil.copy(str(target[0]), "firmware/firmware.bin")
