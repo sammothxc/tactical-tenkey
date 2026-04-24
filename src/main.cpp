@@ -14,16 +14,108 @@ const char* CHANGELOG[] = {
 const uint8_t CHANGELOG_LINES = 7;
 
 // guide pages (shown on first boot)
-const char* GUIDE_PAGES[][4] = {
-    {"BASIC KEYS", "Numbers + operators", "work like a normal", "calculator. Easy!"},
-    {"FN KEY = [-]+[0]", "Hold both keys", "together to activate", "FN combinations."},
-    {"FN + [5] = Macros", "Opens macro menu.", "FN+[8] Up  FN+[2] Dn", "Release FN = Select"},
-    {"FN + [/] = Numpad", "Toggles USB numpad", "mode. Keys send to", "your computer."},
-    {"FN + [C] = Send", "Sends your answer", "to the computer", "via USB keyboard."},
-    {"AUTO SLEEP", "Sleeps after 60s.", "Press [=] to wake.", ""},
-    {"You're all set!", "Happy calculating!", "", "Press [=] to start"},
+struct GuidePage {
+    const char* const* lines;
+    uint8_t lineCount;
 };
-const uint8_t GUIDE_PAGE_COUNT = 7;
+
+static const char* GUIDE_NAVIGATION[] = {
+    "NAVIGATION",
+    "[4] Prev  [6] Next",
+    "[8] Up    [2] Down",
+    "[5]/[Enter] Select",
+    "[NUM] Back",
+    "Universal across",
+    "all menus on this",
+    "device.",
+};
+static const char* GUIDE_BASIC[] = {
+    "BASIC KEYS",
+    "Numbers and + - * /",
+    "work like a normal",
+    "calculator. [Enter]",
+    "computes the result.",
+    "[NUM] clears in",
+    "steps: current entry,",
+    "then pending op,",
+    "then macro name.",
+};
+static const char* GUIDE_MACRO_MENU[] = {
+    "MACRO MENU",
+    "Tap [-]+[0] together",
+    "and release to open",
+    "the macro menu.",
+    "In the menu:",
+    "[8]/[2] scroll",
+    "[5]/[Enter] select",
+    "[NUM] cancel",
+    "Macros then prompt",
+    "for each input.",
+};
+static const char* GUIDE_NUMPAD[] = {
+    "NUMPAD MODE",
+    "Hold [-]+[/] to",
+    "toggle USB numpad",
+    "mode.",
+    "[NUM] toggles NUM/NAV",
+    "state, shown at the",
+    "bottom-left of the",
+    "display.",
+    "NUM: digits + [.]",
+    "NAV:",
+    "[8/2] Up/Down",
+    "[4/6] Left/Right",
+    "[7/1] Home/End",
+    "[9/3] PgUp/PgDn",
+    "[0] Insert",
+    "[.] Delete",
+    "[/] Tab",
+    "[*] Backspace",
+    "[+ - = Enter] work",
+    "in both modes.",
+};
+static const char* GUIDE_SEND[] = {
+    "SEND ANSWER",
+    "Hold [-]+[*] in",
+    "calculator mode to",
+    "type the current",
+    "display to your",
+    "computer via USB.",
+    "Handy for pasting",
+    "results into forms.",
+};
+static const char* GUIDE_SLEEP[] = {
+    "AUTO SLEEP",
+    "Device sleeps after",
+    "60 seconds idle.",
+    "Press [Enter] to",
+    "wake.",
+};
+static const char* GUIDE_DONE[] = {
+    "ALL SET",
+    "Happy calculating!",
+    "[Enter] to start.",
+};
+
+const GuidePage GUIDE_PAGES[] = {
+    {GUIDE_NAVIGATION, sizeof(GUIDE_NAVIGATION) / sizeof(GUIDE_NAVIGATION[0])},
+    {GUIDE_BASIC,      sizeof(GUIDE_BASIC)      / sizeof(GUIDE_BASIC[0])},
+    {GUIDE_MACRO_MENU, sizeof(GUIDE_MACRO_MENU) / sizeof(GUIDE_MACRO_MENU[0])},
+    {GUIDE_NUMPAD,     sizeof(GUIDE_NUMPAD)     / sizeof(GUIDE_NUMPAD[0])},
+    {GUIDE_SEND,       sizeof(GUIDE_SEND)       / sizeof(GUIDE_SEND[0])},
+    {GUIDE_SLEEP,      sizeof(GUIDE_SLEEP)      / sizeof(GUIDE_SLEEP[0])},
+    {GUIDE_DONE,       sizeof(GUIDE_DONE)       / sizeof(GUIDE_DONE[0])},
+};
+const uint8_t GUIDE_PAGE_COUNT = sizeof(GUIDE_PAGES) / sizeof(GUIDE_PAGES[0]);
+
+enum GuideAction {
+    GUIDE_NEXT,
+    GUIDE_PREV,
+    GUIDE_SCROLL_UP,
+    GUIDE_SCROLL_DOWN,
+    GUIDE_SELECT,
+    GUIDE_BACK,
+};
 
 #include <U8g2lib.h>
 #include <Wire.h>
@@ -39,7 +131,7 @@ const uint8_t GUIDE_PAGE_COUNT = 7;
 #define WAKE_PIN 1 // Enter key
 #define SLEEP_TIMEOUT 60000
 
-const uint8_t ROW_PINS[4] = {3, 2, 4, 43};
+const uint8_t ROW_PINS[4] = {42, 2, 4, 43};
 const uint8_t COL_PINS[4] = {9, 8, 7, 44};
 
 const char WAKE_KEY = '=';
@@ -62,7 +154,9 @@ bool bleConnected = false;
 bool usbConnected = true;
 bool lowBattery = false;
 bool numpadMode = false;
+bool numLockOn = true;
 String functionName = "";
+uint32_t messageUntil = 0;
 
 // combo tracking
 bool minusHeld = false;
@@ -91,6 +185,8 @@ void goToSleep();
 void showGuide();
 void showChangelog();
 bool waitForEnter();
+bool isKeyPressed(char target);
+GuideAction waitForGuideNav(bool canScrollUp, bool canScrollDown);
 
 
 void initMatrix() {
@@ -112,12 +208,13 @@ char scanMatrix() {
     bool currentTwo = false;
     bool currentFive = false;
     bool currentSlash = false;
+    bool currentStar = false;
     bool currentClear = false;
-    
+
     for (int row = 0; row < 4; row++) {
         digitalWrite(ROW_PINS[row], LOW);
         delayMicroseconds(10);
-        
+
         for (int col = 0; col < 4; col++) {
             if (digitalRead(COL_PINS[col]) == LOW) {
                 char key = KEYMAP[row][col];
@@ -127,6 +224,7 @@ char scanMatrix() {
                 else if (key == '2') currentTwo = true;
                 else if (key == '5') currentFive = true;
                 else if (key == '/') currentSlash = true;
+                else if (key == '*') currentStar = true;
                 else if (key == 'C') currentClear = true;
                 else pressed = key;
             }
@@ -135,70 +233,104 @@ char scanMatrix() {
     }
     
     bool fnPressed = currentMinus && currentZero;
-    
+
+    // edge detection for minus/zero release-fire
+    static bool prevMinus = false;
+    static bool prevZero = false;
+    static bool minusFnUsed = false;
+    static bool zeroFnUsed = false;
+    bool minusReleased = prevMinus && !currentMinus;
+    bool zeroReleased  = prevZero  && !currentZero;
+    prevMinus = currentMinus;
+    prevZero  = currentZero;
+
+    // while FN chord active, mark both keys as "used for FN"
+    if (fnPressed) {
+        minusFnUsed = true;
+        zeroFnUsed = true;
+    }
+
+    // track FN tap: true while FN is held and nothing else has been pressed
+    static bool wasFn = false;
+    static bool fnComboFired = false;
+    if (fnPressed && !wasFn) {
+        wasFn = true;
+        fnComboFired = false;
+    }
+    // any non-FN key pressed during FN cancels the tap
+    if (fnPressed && (currentSlash || currentStar || currentClear
+                      || currentFive || currentEight || currentTwo
+                      || pressed != 0)) {
+        fnComboFired = true;
+    }
+
     // FN + slash = toggle numpad mode
     if (fnPressed && currentSlash && !fnSlashPressed) {
         fnSlashPressed = true;
         return 'T';
     }
     if (!currentSlash) fnSlashPressed = false;
-    
+
     // FN + clear = send answer
     if (fnPressed && currentClear && !fnClearPressed) {
         fnClearPressed = true;
         return 'A';
     }
     if (!currentClear) fnClearPressed = false;
-    
-    // FN + 5 = open menu
-    static bool fnFivePressed = false;
-    if (fnPressed && currentFive && !fnFivePressed) {
-        fnFivePressed = true;
-        fnHeld = true;
-        fnWasUsed = false;
-        macroMenuOpen();
-        return 'M';
-    }
-    if (!currentFive) fnFivePressed = false;
-    
-    // FN held (after menu opened) - check for navigation
-    if (fnPressed && fnHeld) {
-        if (currentEight) {
-            fnWasUsed = true;
-            return 'U';
-        }
-        if (currentTwo) {
-            fnWasUsed = true;
-            return 'D';
+
+    // FN released: if it was a tap (no combos), open macro menu
+    if (!fnPressed && wasFn) {
+        wasFn = false;
+        bool wasTap = !fnComboFired;
+        fnComboFired = false;
+        // consume release events so - and 0 don't fire on release
+        if (minusReleased) { minusReleased = false; minusFnUsed = false; }
+        if (zeroReleased)  { zeroReleased  = false; zeroFnUsed  = false; }
+        if (wasTap && macro.state == MACRO_IDLE) {
+            macroMenuOpen();
+            return 'M';
         }
         return 0;
     }
-    
-    // FN released while menu open
-    if (!fnPressed && fnHeld) {
-        fnHeld = false;
-        if (macro.state == MACRO_MENU) {
-            macroMenuSelect();
-            return 'S';
-        }
-        return 0;
+
+    // - + / = toggle numpad/calc mode
+    static bool minusSlashChord = false;
+    if (currentMinus && currentSlash && !minusSlashChord) {
+        minusSlashChord = true;
+        minusFnUsed = true;
+        return 'T';
     }
-    
-    // reset combo tracking
-    if (!currentMinus) minusHeld = false;
-    if (!currentZero) zeroHeld = false;
-    
-    // normal single keys (only if FN not held)
-    if (!fnHeld) {
-        if (currentMinus && !zeroHeld) return '-';
-        if (currentZero && !minusHeld) return '0';
-        if (currentEight) return '8';
-        if (currentTwo) return '2';
-        if (currentFive) return '5';
-        if (currentSlash) return '/';
-        if (currentClear) return 'C';
+    if (!currentMinus || !currentSlash) minusSlashChord = false;
+
+    // - + * = send answer (calc mode only)
+    static bool minusStarChord = false;
+    if (!numpadMode && currentMinus && currentStar && !minusStarChord) {
+        minusStarChord = true;
+        minusFnUsed = true;
+        return 'A';
     }
-    
+    if (!currentMinus || !currentStar) minusStarChord = false;
+
+    // minus/zero fire on release, and only if they weren't part of an FN chord
+    if (minusReleased) {
+        bool wasSolo = !minusFnUsed;
+        minusFnUsed = false;
+        if (wasSolo) return '-';
+    }
+    if (zeroReleased) {
+        bool wasSolo = !zeroFnUsed;
+        zeroFnUsed = false;
+        if (wasSolo) return '0';
+    }
+
+    // other single keys fire on press (suppress / and * while - is held)
+    if (currentEight) return '8';
+    if (currentTwo) return '2';
+    if (currentFive) return '5';
+    if (currentSlash && !currentMinus) return '/';
+    if (currentStar && !currentMinus) return '*';
+    if (currentClear) return 'C';
+
     return pressed;
 }
 
@@ -213,7 +345,42 @@ char scanWakeKey() {
 
 void handleKey(char key) {
     lastActivity = millis();
-    
+    messageUntil = 0; // any keypress dismisses the RESULT SENT message
+
+    // menu just opened
+    if (key == 'M') {
+        drawMacroMenu();
+        return;
+    }
+
+    // while menu is open, keys are modal: 8/2 nav, 5 select, C cancel
+    if (macro.state == MACRO_MENU) {
+        if (key == '8') {
+            macroMenuUp();
+            drawMacroMenu();
+            return;
+        }
+        if (key == '2') {
+            macroMenuDown();
+            drawMacroMenu();
+            return;
+        }
+        if (key == '5' || key == '=') {
+            macroMenuSelect();
+            functionName = macro.functionName;
+            displayValue = "0";
+            newEntry = true;
+            updateDisplay();
+            return;
+        }
+        if (key == 'C') {
+            macro.state = MACRO_IDLE;
+            updateDisplay();
+            return;
+        }
+        return; // ignore other keys while menu is open
+    }
+
     // toggle numpad/calc mode
     if (key == 'T') {
         numpadMode = !numpadMode;
@@ -228,89 +395,24 @@ void handleKey(char key) {
         updateDisplay();
         return;
     }
-    
+
     // send answer to computer
     if (key == 'A') {
         hidInit();
         hidSendString(displayValue);
-        // brief visual feedback
-        String temp = displayValue;
-        displayValue = "SENT";
-        updateDisplay();
-        delay(300);
-        displayValue = temp;
+        messageUntil = millis() + 5000;
         updateDisplay();
         return;
     }
     
-    // cancel menu
-    if (key == 'X') {
-        macro.state = MACRO_IDLE;
-        updateDisplay();
-        return;
-    }
-    
-    // menu controls
-    if (key == 'M') {
-        drawMacroMenu();
-        return;
-    }
-    if (key == 'U' && macro.state == MACRO_MENU) {
-        macroMenuUp();
-        drawMacroMenu();
-        return;
-    }
-    if (key == 'D' && macro.state == MACRO_MENU) {
-        macroMenuDown();
-        drawMacroMenu();
-        return;
-    }
-    if (key == 'S') {
-        functionName = macro.functionName;
-        displayValue = "0";
-        newEntry = true;
-        updateDisplay();
-        return;
-    }
-    
-    // FN combo when not in menu: quick exit
-    if (key == 'F') {
-        macroCancel();
-        functionName = "";
-        numpadMode = false;
-        updateDisplay();
-        return;
-    }
-    
-    // NUMPAD MODE - send keys to computer
+    // NUMPAD MODE - send keys to computer, don't touch display
     if (numpadMode) {
-        hidSendKey(key);
-        // still show on display for feedback
-        if (key >= '0' && key <= '9') {
-            if (newEntry) {
-                displayValue = key;
-                newEntry = false;
-            } else if (displayValue.length() < 10) {
-                displayValue += key;
-            }
+        if (key == 'C') {
+            numLockOn = !numLockOn;
+            updateDisplay();
+            return;
         }
-        else if (key == '.') {
-            if (newEntry) {
-                displayValue = "0.";
-                newEntry = false;
-            } else if (displayValue.indexOf('.') == -1) {
-                displayValue += '.';
-            }
-        }
-        else if (key == '=' || key == 'C') {
-            displayValue = "0";
-            newEntry = true;
-        }
-        else if (key == '+' || key == '-' || key == '*' || key == '/') {
-            displayValue = "0";
-            newEntry = true;
-        }
-        updateDisplay();
+        hidSendKey(key, numLockOn);
         return;
     }
     
@@ -335,7 +437,7 @@ void handleKey(char key) {
             displayValue = key;
             newEntry = false;
         } else {
-            if (displayValue.length() < 10) {
+            if (displayValue.length() < 13) {
                 displayValue += key;
             }
         }
@@ -349,16 +451,21 @@ void handleKey(char key) {
         }
     }
     else if (key == '+' || key == '-' || key == '*' || key == '/') {
-        if (storedValue.length() > 0 && pendingOp && !newEntry) {
-            double a = storedValue.toDouble();
-            double b = displayValue.toDouble();
-            double result = calculate(a, b, pendingOp);
-            displayValue = formatResult(result);
+        if (newEntry && storedValue.length() > 0 && pendingOp) {
+            // no new operand typed yet — just swap the operator
+            pendingOp = key;
+        } else {
+            if (storedValue.length() > 0 && pendingOp && !newEntry) {
+                double a = storedValue.toDouble();
+                double b = displayValue.toDouble();
+                double result = calculate(a, b, pendingOp);
+                displayValue = formatResult(result);
+            }
+            storedValue = displayValue;
+            pendingOp = key;
+            displayValue = "";
+            newEntry = true;
         }
-        storedValue = displayValue;
-        pendingOp = key;
-        displayValue = "";
-        newEntry = true;
     }
     else if (key == '=') {
         if (storedValue.length() > 0 && pendingOp) {
@@ -372,7 +479,7 @@ void handleKey(char key) {
         }
     }
     else if (key == 'C') {
-        if (displayValue != "" && !newEntry) {
+        if (displayValue.length() > 0) {
             displayValue = "";
             newEntry = true;
         } else if (storedValue.length() > 0 || pendingOp) {
@@ -434,7 +541,7 @@ void drawMacroMenu() {
         }
     }
     u8g2.setFont(u8g2_font_5x7_tr);
-    u8g2.drawStr(0, 64, "[8] Up  [2] Down [Release FN] Select");
+    u8g2.drawStr(0, 64, "[8][2]Nav [5]Sel [NUM]Bk");
     u8g2.sendBuffer();
 }
 
@@ -487,19 +594,37 @@ void drawBottomBar() {
         iconX -= ICON_WIDTH;  // blank
     }
     
-    // leftmost: function name
-    if (functionName.length() > 0) {
+    // leftmost: RESULT SENT flash, NUM/NAV in numpad mode, else function name
+    if (messageUntil > 0 && millis() < messageUntil) {
+        u8g2.drawStr(0, 64, "RESULT SENT");
+    } else if (numpadMode) {
+        u8g2.drawStr(0, 64, numLockOn ? "NUM" : "NAV");
+    } else if (functionName.length() > 0) {
         u8g2.drawStr(0, 64, functionName.c_str());
     }
 }
 
 
 void drawMainDisplay() {
-    u8g2.setFont(u8g2_font_logisoso32_tn);
+    int len = displayValue.length();
+    int16_t y;
+    if (len <= 6) {
+        u8g2.setFont(u8g2_font_logisoso32_tn);
+        y = 50;
+    } else if (len <= 8) {
+        u8g2.setFont(u8g2_font_logisoso24_tn);
+        y = 47;
+    } else if (len <= 10) {
+        u8g2.setFont(u8g2_font_logisoso20_tn);
+        y = 45;
+    } else {
+        u8g2.setFont(u8g2_font_logisoso16_tn);
+        y = 43;
+    }
     int16_t width = u8g2.getStrWidth(displayValue.c_str());
     int16_t x = 128 - width - 2;
     if (x < 0) x = 0;
-    u8g2.drawStr(x, 50, displayValue.c_str());
+    u8g2.drawStr(x, y, displayValue.c_str());
 }
 
 
@@ -572,15 +697,91 @@ bool waitForEnter() {
 }
 
 
-void showGuide() {
-    for (uint8_t page = 0; page < GUIDE_PAGE_COUNT; page++) {
-        u8g2.clearBuffer();
-        u8g2.setFont(u8g2_font_6x10_tr);
-        for (int line = 0; line < 4; line++) {
-            if (strlen(GUIDE_PAGES[page][line]) > 0) {
-                u8g2.drawStr(0, 14 + (line * 14), GUIDE_PAGES[page][line]);
+bool isKeyPressed(char target) {
+    bool found = false;
+    for (int row = 0; row < 4; row++) {
+        digitalWrite(ROW_PINS[row], LOW);
+        delayMicroseconds(10);
+        for (int col = 0; col < 4; col++) {
+            if (digitalRead(COL_PINS[col]) == LOW && KEYMAP[row][col] == target) {
+                found = true;
             }
         }
+        digitalWrite(ROW_PINS[row], HIGH);
+    }
+    return found;
+}
+
+
+GuideAction waitForGuideNav(bool canScrollUp, bool canScrollDown) {
+    while (true) {
+        if (digitalRead(WAKE_PIN) == LOW) {
+            delay(50);
+            while (digitalRead(WAKE_PIN) == LOW) delay(10);
+            return GUIDE_SELECT;
+        }
+        if (isKeyPressed('6')) {
+            delay(50);
+            while (isKeyPressed('6')) delay(10);
+            return GUIDE_NEXT;
+        }
+        if (isKeyPressed('4')) {
+            delay(50);
+            while (isKeyPressed('4')) delay(10);
+            return GUIDE_PREV;
+        }
+        if (canScrollUp && isKeyPressed('8')) {
+            delay(50);
+            while (isKeyPressed('8')) delay(10);
+            return GUIDE_SCROLL_UP;
+        }
+        if (canScrollDown && isKeyPressed('2')) {
+            delay(50);
+            while (isKeyPressed('2')) delay(10);
+            return GUIDE_SCROLL_DOWN;
+        }
+        if (isKeyPressed('5')) {
+            delay(50);
+            while (isKeyPressed('5')) delay(10);
+            return GUIDE_SELECT;
+        }
+        if (isKeyPressed('C')) {
+            delay(50);
+            while (isKeyPressed('C')) delay(10);
+            return GUIDE_BACK;
+        }
+        delay(20);
+    }
+}
+
+
+void showGuide() {
+    const int visibleLines = 4;
+    int page = 0;
+    int scroll = 0;
+    while (page < GUIDE_PAGE_COUNT) {
+        int lineCount = GUIDE_PAGES[page].lineCount;
+        int maxScroll = lineCount > visibleLines ? lineCount - visibleLines : 0;
+        if (scroll > maxScroll) scroll = maxScroll;
+        if (scroll < 0) scroll = 0;
+
+        u8g2.clearBuffer();
+        u8g2.setFont(u8g2_font_6x10_tr);
+        for (int line = 0; line < visibleLines && (scroll + line) < lineCount; line++) {
+            const char* text = GUIDE_PAGES[page].lines[scroll + line];
+            if (strlen(text) > 0) {
+                u8g2.drawStr(0, 12 + (line * 12), text);
+            }
+        }
+
+        // scroll arrows (top-right / above progress dots)
+        if (scroll > 0) {
+            u8g2.drawTriangle(123, 0, 119, 4, 127, 4);
+        }
+        if (scroll < maxScroll) {
+            u8g2.drawTriangle(123, 57, 119, 53, 127, 53);
+        }
+
         // progress dots at bottom
         u8g2.setFont(u8g2_font_5x7_tr);
         int dotsWidth = GUIDE_PAGE_COUNT * 6;
@@ -594,7 +795,28 @@ void showGuide() {
         }
         u8g2.sendBuffer();
         lastActivity = millis();
-        waitForEnter();
+
+        GuideAction action = waitForGuideNav(scroll > 0, scroll < maxScroll);
+        switch (action) {
+            case GUIDE_NEXT:
+            case GUIDE_SELECT:
+                page++;
+                scroll = 0;
+                break;
+            case GUIDE_PREV:
+                if (page > 0) { page--; scroll = 0; }
+                break;
+            case GUIDE_BACK:
+                if (page > 0) { page--; scroll = 0; }
+                else return;
+                break;
+            case GUIDE_SCROLL_UP:
+                if (scroll > 0) scroll--;
+                break;
+            case GUIDE_SCROLL_DOWN:
+                if (scroll < maxScroll) scroll++;
+                break;
+        }
     }
 }
 
@@ -633,6 +855,9 @@ void setup() {
         
         bool firstBoot = prefs.getBool("guided", false) == false;
         String lastRelease = prefs.getString("fwRel", "");
+#ifdef FORCE_FIRST_BOOT
+        firstBoot = true;
+#endif
         
         if (firstBoot) {
             showBootScreen();
@@ -663,8 +888,14 @@ void loop() {
         handleKey(key);
     }
     lastKey = key;
-    
-    if (millis() - lastActivity > SLEEP_TIMEOUT) {
+
+    // clear the RESULT SENT message once its window expires
+    if (messageUntil > 0 && millis() >= messageUntil) {
+        messageUntil = 0;
+        updateDisplay();
+    }
+
+    if (!numpadMode && millis() - lastActivity > SLEEP_TIMEOUT) {
         goToSleep();
     }
     delay(20);
