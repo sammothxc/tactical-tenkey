@@ -42,7 +42,7 @@ jobs:
           if [ "${{ github.ref_type }}" = "tag" ]; then
             raw="${GITHUB_REF_NAME#v}"
           else
-            maj_min=$(python -c 'import json; v=json.load(open("version.json")); print(f"{v[\"major\"]}.{v[\"minor\"]}")')
+            maj_min=$(python -c 'import json; v=json.load(open("version.json")); print("{}.{}".format(v["major"], v["minor"]))')
             raw="${maj_min}.${{ github.run_number }}"
           fi
           echo "override=$raw" >> "$GITHUB_OUTPUT"
