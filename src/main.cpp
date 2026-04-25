@@ -46,7 +46,7 @@ static const char* GUIDE_MACRO_MENU[] = {
     "and release to open",
     "the macro menu.",
     "[4]/[6] page between",
-    "Macros, Settings, BT.",
+    "Macros and Settings.",
     "In the menu:",
     "[8]/[2] scroll",
     "[5]/[Enter] select",
@@ -161,7 +161,6 @@ uint32_t messageUntil = 0;
 enum MenuPage {
     MENU_PAGE_MACROS = 0,
     MENU_PAGE_SETTINGS,
-    MENU_PAGE_BT,
     MENU_PAGE_COUNT
 };
 uint8_t menuPage = MENU_PAGE_MACROS;
@@ -179,7 +178,9 @@ enum SettingsView {
     SETTINGS_VIEW_BRIGHTNESS,
     SETTINGS_VIEW_FW_INFO,
     SETTINGS_VIEW_QBIND_LIST,
-    SETTINGS_VIEW_QBIND_PICK
+    SETTINGS_VIEW_QBIND_PICK,
+    SETTINGS_VIEW_RESET_CONFIRM,
+    SETTINGS_VIEW_BT
 };
 SettingsView settingsView = SETTINGS_VIEW_LIST;
 uint8_t settingsIndex = 0;
@@ -198,8 +199,10 @@ const char* SETTINGS_NAMES[] = {
     "Contrast",
     "Brightness",
     "Quick Bind",
+    "Bluetooth",
     "Show Guide",
-    "FW Info"
+    "FW Info",
+    "Factory Reset"
 };
 const uint8_t SETTINGS_COUNT = sizeof(SETTINGS_NAMES) / sizeof(SETTINGS_NAMES[0]);
 
@@ -221,8 +224,8 @@ void drawMenu();
 void drawMenuHeader(const char* title);
 void drawMacroPage();
 void drawSettingsPage();
-void drawBTPage();
 void saveSettings();
+void factoryReset();
 void handleSettingsKey(char key);
 void drawTopBar();
 void drawBottomBar();
@@ -490,11 +493,17 @@ void handleKey(char key) {
                     case 3: // Quick Bind
                         settingsView = SETTINGS_VIEW_QBIND_LIST;
                         break;
-                    case 4: // Show Guide
+                    case 4: // Bluetooth
+                        settingsView = SETTINGS_VIEW_BT;
+                        break;
+                    case 5: // Show Guide
                         showGuide();
                         break;
-                    case 5: // FW Info
+                    case 6: // FW Info
                         settingsView = SETTINGS_VIEW_FW_INFO;
+                        break;
+                    case 7: // Factory Reset
+                        settingsView = SETTINGS_VIEW_RESET_CONFIRM;
                         break;
                 }
                 drawMenu();
@@ -798,6 +807,18 @@ static void drawQbindPick() {
     u8g2.drawStr(0, 64, "[8/2]Nav [5]Save [NUM]Bk");
 }
 
+static void drawResetConfirm() {
+    u8g2.setFont(u8g2_font_6x10_tr);
+    const char* l1 = "FACTORY RESET";
+    int16_t w1 = u8g2.getStrWidth(l1);
+    u8g2.drawStr((128 - w1) / 2, 26, l1);
+
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 40, "Wipes settings, binds,");
+    u8g2.drawStr(0, 50, "and shows guide on boot.");
+    u8g2.drawStr(0, 64, "[5]Confirm [NUM]Cancel");
+}
+
 static void drawFwInfo() {
     u8g2.setFont(u8g2_font_6x10_tr);
     u8g2.drawStr(0, 24, "Tactical Tenkey");
@@ -821,6 +842,8 @@ void drawSettingsPage() {
         char hdr[16];
         snprintf(hdr, sizeof(hdr), "BIND FN+%u", qbindEditSlot);
         u8g2.drawStr(0, 10, hdr);
+    } else if (settingsView == SETTINGS_VIEW_BT) {
+        u8g2.drawStr(0, 10, "BLUETOOTH");
     } else {
         u8g2.drawStr(0, 10, "SETTINGS");
     }
@@ -832,6 +855,8 @@ void drawSettingsPage() {
         case SETTINGS_VIEW_FW_INFO:     drawFwInfo(); break;
         case SETTINGS_VIEW_QBIND_LIST:  drawQbindList(); break;
         case SETTINGS_VIEW_QBIND_PICK:  drawQbindPick(); break;
+        case SETTINGS_VIEW_RESET_CONFIRM: drawResetConfirm(); break;
+        case SETTINGS_VIEW_BT:          drawBTSettings(); break;
         default: break;
     }
 }
@@ -845,6 +870,22 @@ void saveSettings() {
     p.putUChar("ledBri", ledBrightness);
     p.putBytes("qbind", qbindSlots, sizeof(qbindSlots));
     p.end();
+}
+
+
+void factoryReset() {
+    Preferences p;
+    p.begin("t2", false);
+    p.clear();  // wipes everything including "guided" and "fwRel"
+    p.end();
+
+    sleepTimeoutMs = DEFAULT_SLEEP_TIMEOUT;
+    oledContrast = 255;
+    ledBrightness = 255;
+    for (int i = 0; i < 10; i++) qbindSlots[i] = -1;
+
+    u8g2.setContrast(oledContrast);
+    analogWrite(LED_PIN, ledBrightness);
 }
 
 
@@ -956,18 +997,28 @@ void handleSettingsKey(char key) {
         return;
     }
 
+    if (settingsView == SETTINGS_VIEW_RESET_CONFIRM) {
+        if (key == '5' || key == '=') {
+            factoryReset();
+            settingsView = SETTINGS_VIEW_LIST;
+            settingsIndex = 0;
+            drawMenu();
+            return;
+        }
+        return;
+    }
+
     // SETTINGS_VIEW_FW_INFO: only C exits (handled above)
 }
 
 
-void drawBTPage() {
-    drawMenuHeader("BLUETOOTH");
+static void drawBTSettings() {
     u8g2.setFont(u8g2_font_6x10_tr);
     const char* msg = "(coming soon)";
     int16_t w = u8g2.getStrWidth(msg);
     u8g2.drawStr((128 - w) / 2, 38, msg);
     u8g2.setFont(u8g2_font_5x7_tr);
-    u8g2.drawStr(0, 64, "[4][6]Pg [NUM]Bk");
+    u8g2.drawStr(0, 64, "[NUM] Back");
 }
 
 
@@ -976,7 +1027,6 @@ void drawMenu() {
     switch (menuPage) {
         case MENU_PAGE_MACROS:   drawMacroPage();    break;
         case MENU_PAGE_SETTINGS: drawSettingsPage(); break;
-        case MENU_PAGE_BT:       drawBTPage();       break;
     }
     u8g2.sendBuffer();
 }
