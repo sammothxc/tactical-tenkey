@@ -181,7 +181,9 @@ enum SettingsView {
     SETTINGS_VIEW_QBIND_LIST,
     SETTINGS_VIEW_QBIND_PICK,
     SETTINGS_VIEW_RESET_CONFIRM,
-    SETTINGS_VIEW_BT
+    SETTINGS_VIEW_BT,
+    SETTINGS_VIEW_BT_BONDS,
+    SETTINGS_VIEW_BT_FORGET
 };
 SettingsView settingsView = SETTINGS_VIEW_LIST;
 uint8_t settingsIndex = 0;
@@ -202,9 +204,16 @@ uint8_t btMenuIdx = 0;
 const char* BT_ITEM_NAMES[] = {
     "Pair New Device",
     "Reconnect",
+    "Paired Devices",
     "Forget All Bonds"
 };
 const uint8_t BT_ITEM_COUNT = sizeof(BT_ITEM_NAMES) / sizeof(BT_ITEM_NAMES[0]);
+
+// bonds list cache (filled on entering BT_BONDS view to avoid re-init churn)
+#define BT_BOND_MAX 9
+String btBondAddrs[BT_BOND_MAX];
+uint8_t btBondCount = 0;
+uint8_t btBondIdx = 0;
 
 // macro quick bind: slot index holds a macro index, -1 = unbound
 // (slot 5 unused: -+5 is the FN chord)
@@ -845,6 +854,54 @@ static void drawResetConfirm() {
     u8g2.drawStr(0, 64, "[5]Confirm [NUM]Cancel");
 }
 
+static void drawBTBondsList() {
+    if (btBondCount == 0) {
+        u8g2.setFont(u8g2_font_6x10_tr);
+        const char* msg = "(no paired devices)";
+        int16_t w = u8g2.getStrWidth(msg);
+        u8g2.drawStr((128 - w) / 2, 38, msg);
+        u8g2.setFont(u8g2_font_5x7_tr);
+        u8g2.drawStr(0, 64, "[NUM] Back");
+        return;
+    }
+
+    int total = btBondCount;
+    int startIdx = (int)btBondIdx - 1;
+    if (startIdx < 0) startIdx = 0;
+    if (startIdx > total - 3) startIdx = total - 3;
+    if (total <= 3) startIdx = 0;
+
+    u8g2.setFont(u8g2_font_6x10_tr);
+    for (int i = 0; i < 3 && (startIdx + i) < total; i++) {
+        int idx = startIdx + i;
+        int y = 25 + (i * 14);
+        const char* s = btBondAddrs[idx].c_str();
+        if (idx == (int)btBondIdx) {
+            u8g2.drawBox(0, y - 10, 128, 14);
+            u8g2.setDrawColor(0);
+            u8g2.drawStr(2, y, s);
+            u8g2.setDrawColor(1);
+        } else {
+            u8g2.drawStr(2, y, s);
+        }
+    }
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 64, "[8/2]Nav [5]Forget [NUM]Bk");
+}
+
+
+static void drawBTForgetConfirm() {
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 24, "Forget bond:");
+    if (btBondIdx < btBondCount) {
+        u8g2.setFont(u8g2_font_6x10_tr);
+        u8g2.drawStr(0, 40, btBondAddrs[btBondIdx].c_str());
+    }
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 64, "[5]Confirm [NUM]Cancel");
+}
+
+
 static void drawBTSettings() {
     // 3 items: Pair / Reconnect / Forget
     int total = BT_ITEM_COUNT;
@@ -897,6 +954,10 @@ void drawSettingsPage() {
     } else if (settingsView == SETTINGS_VIEW_BT) {
         String s = bleStatusLine();
         u8g2.drawStr(0, 10, s.c_str());
+    } else if (settingsView == SETTINGS_VIEW_BT_BONDS) {
+        u8g2.drawStr(0, 10, "PAIRED");
+    } else if (settingsView == SETTINGS_VIEW_BT_FORGET) {
+        u8g2.drawStr(0, 10, "FORGET?");
     } else {
         u8g2.drawStr(0, 10, "SETTINGS");
     }
@@ -910,6 +971,8 @@ void drawSettingsPage() {
         case SETTINGS_VIEW_QBIND_PICK:  drawQbindPick(); break;
         case SETTINGS_VIEW_RESET_CONFIRM: drawResetConfirm(); break;
         case SETTINGS_VIEW_BT:          drawBTSettings(); break;
+        case SETTINGS_VIEW_BT_BONDS:    drawBTBondsList(); break;
+        case SETTINGS_VIEW_BT_FORGET:   drawBTForgetConfirm(); break;
         default: break;
     }
 }
@@ -942,6 +1005,18 @@ void factoryReset() {
 
     u8g2.setContrast(oledContrast);
     analogWrite(LED_PIN, ledBrightness);
+}
+
+
+void btRefreshBondsCache() {
+    uint8_t total = hidBleGetBondCount();
+    btBondCount = total > BT_BOND_MAX ? BT_BOND_MAX : total;
+    for (uint8_t i = 0; i < btBondCount; i++) {
+        btBondAddrs[i] = hidBleGetBondAddress(i);
+    }
+    if (btBondIdx >= btBondCount && btBondCount > 0) {
+        btBondIdx = btBondCount - 1;
+    }
 }
 
 
@@ -1026,8 +1101,14 @@ String bleStatusLine() {
 
 void handleSettingsKey(char key) {
     if (key == 'C') {
-        settingsView = SETTINGS_VIEW_LIST;
-        settingsInput = "";
+        if (settingsView == SETTINGS_VIEW_BT_FORGET) {
+            settingsView = SETTINGS_VIEW_BT_BONDS;
+        } else if (settingsView == SETTINGS_VIEW_BT_BONDS) {
+            settingsView = SETTINGS_VIEW_BT;
+        } else {
+            settingsView = SETTINGS_VIEW_LIST;
+            settingsInput = "";
+        }
         drawMenu();
         return;
     }
@@ -1145,10 +1226,52 @@ void handleSettingsKey(char key) {
         }
         if (key == '5' || key == '=') {
             switch (btMenuIdx) {
-                case 0: bleStartPairing(); break;
+                case 0: bleStartPairing();    break;
                 case 1: bleStartAdvertising(); break;
-                case 2: bleShutdown(); hidBleClearAllBonds(); break;
+                case 2:
+                    btBondIdx = 0;
+                    btRefreshBondsCache();
+                    settingsView = SETTINGS_VIEW_BT_BONDS;
+                    break;
+                case 3:
+                    bleShutdown();
+                    hidBleClearAllBonds();
+                    break;
             }
+            drawMenu();
+            return;
+        }
+        return;
+    }
+
+    if (settingsView == SETTINGS_VIEW_BT_BONDS) {
+        if (btBondCount == 0) return;  // only NUM is meaningful (handled above)
+        if (key == '8') {
+            if (btBondIdx > 0) btBondIdx--;
+            drawMenu();
+            return;
+        }
+        if (key == '2') {
+            if (btBondIdx < btBondCount - 1) btBondIdx++;
+            drawMenu();
+            return;
+        }
+        if (key == '5' || key == '=') {
+            settingsView = SETTINGS_VIEW_BT_FORGET;
+            drawMenu();
+            return;
+        }
+        return;
+    }
+
+    if (settingsView == SETTINGS_VIEW_BT_FORGET) {
+        if (key == '5' || key == '=') {
+            // if forgetting the currently-connected peer, drop the connection first
+            bool wasConnected = (bleMode == BLE_MODE_CONNECTED);
+            if (wasConnected) bleShutdown();
+            hidBleDeleteBond(btBondIdx);
+            btRefreshBondsCache();
+            settingsView = SETTINGS_VIEW_BT_BONDS;
             drawMenu();
             return;
         }

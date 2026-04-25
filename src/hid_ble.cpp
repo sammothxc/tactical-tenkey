@@ -73,6 +73,43 @@ void hidBleClearAllBonds() {
 }
 
 
+String hidBleGetBondAddress(uint8_t index) {
+    bool wasActive = bleActive;
+    if (!NimBLEDevice::getInitialized()) {
+        NimBLEDevice::init("Tactical Tenkey");
+    }
+    String result = "";
+    int n = NimBLEDevice::getNumBonds();
+    if ((int)index < n) {
+        NimBLEAddress addr = NimBLEDevice::getBondedAddress(index);
+        result = String(addr.toString().c_str());
+        result.toUpperCase();
+    }
+    if (!wasActive) {
+        NimBLEDevice::deinit(true);
+    }
+    return result;
+}
+
+
+bool hidBleDeleteBond(uint8_t index) {
+    bool wasActive = bleActive;
+    if (!NimBLEDevice::getInitialized()) {
+        NimBLEDevice::init("Tactical Tenkey");
+    }
+    bool ok = false;
+    int n = NimBLEDevice::getNumBonds();
+    if ((int)index < n) {
+        NimBLEAddress addr = NimBLEDevice::getBondedAddress(index);
+        ok = NimBLEDevice::deleteBond(addr);
+    }
+    if (!wasActive) {
+        NimBLEDevice::deinit(true);
+    }
+    return ok;
+}
+
+
 void hidBleSendNumpadKey(char key, bool numLockOn) {
     if (!bleActive || !bleKb || !bleKb->isConnected()) return;
 

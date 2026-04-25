@@ -23,6 +23,12 @@ uint8_t hidBleGetBondCount();
 // Wipe all bonded peers.
 void hidBleClearAllBonds();
 
+// Address of bonded peer at index (0..getBondCount()-1). Empty on out-of-range.
+String hidBleGetBondAddress(uint8_t index);
+
+// Delete a single bond by index. Returns true if removed.
+bool hidBleDeleteBond(uint8_t index);
+
 // Send a single numpad key (mirrors hidUsbSendNumpadKey contract).
 void hidBleSendNumpadKey(char key, bool numLockOn);
 
