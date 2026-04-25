@@ -819,6 +819,16 @@ static void drawResetConfirm() {
     u8g2.drawStr(0, 64, "[5]Confirm [NUM]Cancel");
 }
 
+static void drawBTSettings() {
+    u8g2.setFont(u8g2_font_6x10_tr);
+    const char* msg = "(coming soon)";
+    int16_t w = u8g2.getStrWidth(msg);
+    u8g2.drawStr((128 - w) / 2, 38, msg);
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 64, "[NUM] Back");
+}
+
+
 static void drawFwInfo() {
     u8g2.setFont(u8g2_font_6x10_tr);
     u8g2.drawStr(0, 24, "Tactical Tenkey");
@@ -1009,16 +1019,6 @@ void handleSettingsKey(char key) {
     }
 
     // SETTINGS_VIEW_FW_INFO: only C exits (handled above)
-}
-
-
-static void drawBTSettings() {
-    u8g2.setFont(u8g2_font_6x10_tr);
-    const char* msg = "(coming soon)";
-    int16_t w = u8g2.getStrWidth(msg);
-    u8g2.drawStr((128 - w) / 2, 38, msg);
-    u8g2.setFont(u8g2_font_5x7_tr);
-    u8g2.drawStr(0, 64, "[NUM] Back");
 }
 
 
