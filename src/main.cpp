@@ -122,7 +122,7 @@ enum GuideAction {
 #include <Preferences.h>
 #include "icons.h"
 #include "macros.h"
-#include "usbhid.h"
+#include "hid.h"
 #include "driver/rtc_io.h"
 
 #define SDA_PIN 5
