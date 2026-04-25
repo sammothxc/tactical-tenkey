@@ -123,6 +123,7 @@ enum GuideAction {
 #include "icons.h"
 #include "macros.h"
 #include "hid.h"
+#include "hid_ble.h"
 #include "driver/rtc_io.h"
 
 #define SDA_PIN 5
@@ -186,6 +187,25 @@ SettingsView settingsView = SETTINGS_VIEW_LIST;
 uint8_t settingsIndex = 0;
 String settingsInput = "";
 
+// BLE state
+enum BleMode {
+    BLE_MODE_OFF = 0,
+    BLE_MODE_ADVERTISING,
+    BLE_MODE_PAIRING,
+    BLE_MODE_CONNECTED
+};
+BleMode bleMode = BLE_MODE_OFF;
+uint32_t bleModeUntil = 0;
+const uint32_t BLE_PAIRING_WINDOW_MS = 60000;
+const uint32_t BLE_ADVERTISE_WINDOW_MS = 180000;
+uint8_t btMenuIdx = 0;
+const char* BT_ITEM_NAMES[] = {
+    "Pair New Device",
+    "Reconnect",
+    "Forget All Bonds"
+};
+const uint8_t BT_ITEM_COUNT = sizeof(BT_ITEM_NAMES) / sizeof(BT_ITEM_NAMES[0]);
+
 // macro quick bind: slot index holds a macro index, -1 = unbound
 // (slot 5 unused: -+5 is the FN chord)
 int8_t qbindSlots[10] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
@@ -227,6 +247,11 @@ void drawSettingsPage();
 void saveSettings();
 void factoryReset();
 void handleSettingsKey(char key);
+void bleStartAdvertising();
+void bleStartPairing();
+void bleShutdown();
+void blePoll();
+String bleStatusLine();
 void drawTopBar();
 void drawBottomBar();
 void drawMainDisplay();
@@ -821,12 +846,28 @@ static void drawResetConfirm() {
 }
 
 static void drawBTSettings() {
+    // 3 items: Pair / Reconnect / Forget
+    int total = BT_ITEM_COUNT;
+    int startIdx = (int)btMenuIdx - 1;
+    if (startIdx < 0) startIdx = 0;
+    if (startIdx > total - 3) startIdx = total - 3;
+    if (total <= 3) startIdx = 0;
+
     u8g2.setFont(u8g2_font_6x10_tr);
-    const char* msg = "(coming soon)";
-    int16_t w = u8g2.getStrWidth(msg);
-    u8g2.drawStr((128 - w) / 2, 38, msg);
+    for (int i = 0; i < 3 && (startIdx + i) < total; i++) {
+        int idx = startIdx + i;
+        int y = 25 + (i * 14);
+        if (idx == (int)btMenuIdx) {
+            u8g2.drawBox(0, y - 10, 128, 14);
+            u8g2.setDrawColor(0);
+            u8g2.drawStr(4, y, BT_ITEM_NAMES[idx]);
+            u8g2.setDrawColor(1);
+        } else {
+            u8g2.drawStr(4, y, BT_ITEM_NAMES[idx]);
+        }
+    }
     u8g2.setFont(u8g2_font_5x7_tr);
-    u8g2.drawStr(0, 64, "[NUM] Back");
+    u8g2.drawStr(0, 64, "[8/2]Nav [5]Sel [NUM]Bk");
 }
 
 
@@ -854,7 +895,8 @@ void drawSettingsPage() {
         snprintf(hdr, sizeof(hdr), "BIND FN+%u", qbindEditSlot);
         u8g2.drawStr(0, 10, hdr);
     } else if (settingsView == SETTINGS_VIEW_BT) {
-        u8g2.drawStr(0, 10, "BLUETOOTH");
+        String s = bleStatusLine();
+        u8g2.drawStr(0, 10, s.c_str());
     } else {
         u8g2.drawStr(0, 10, "SETTINGS");
     }
@@ -895,8 +937,90 @@ void factoryReset() {
     ledBrightness = 255;
     for (int i = 0; i < 10; i++) qbindSlots[i] = -1;
 
+    bleShutdown();
+    hidBleClearAllBonds();
+
     u8g2.setContrast(oledContrast);
     analogWrite(LED_PIN, ledBrightness);
+}
+
+
+void bleStartAdvertising() {
+    hidBleInit(false);
+    bleMode = BLE_MODE_ADVERTISING;
+    bleModeUntil = millis() + BLE_ADVERTISE_WINDOW_MS;
+}
+
+
+void bleStartPairing() {
+    hidBleInit(true);
+    bleMode = BLE_MODE_PAIRING;
+    bleModeUntil = millis() + BLE_PAIRING_WINDOW_MS;
+}
+
+
+void bleShutdown() {
+    hidBleDeinit();
+    bleMode = BLE_MODE_OFF;
+    bleConnected = false;
+    bleModeUntil = 0;
+}
+
+
+void blePoll() {
+    if (bleMode == BLE_MODE_OFF) return;
+
+    bool conn = hidBleIsConnected();
+
+    if (conn) {
+        if (bleMode != BLE_MODE_CONNECTED) {
+            bleMode = BLE_MODE_CONNECTED;
+            bleConnected = true;
+            bleModeUntil = 0;
+            updateDisplay();
+        }
+        return;
+    }
+
+    // not connected
+    if (bleMode == BLE_MODE_CONNECTED) {
+        // peer dropped: re-enter advertising window
+        bleMode = BLE_MODE_ADVERTISING;
+        bleModeUntil = millis() + BLE_ADVERTISE_WINDOW_MS;
+        bleConnected = false;
+        updateDisplay();
+        return;
+    }
+
+    // ADVERTISING or PAIRING: deinit when window expires
+    if (bleModeUntil != 0 && (int32_t)(millis() - bleModeUntil) >= 0) {
+        bleShutdown();
+        updateDisplay();
+    }
+}
+
+
+String bleStatusLine() {
+    switch (bleMode) {
+        case BLE_MODE_CONNECTED:
+            return "CONNECTED";
+        case BLE_MODE_PAIRING: {
+            uint32_t left = (bleModeUntil > millis()) ? (bleModeUntil - millis()) / 1000 : 0;
+            char buf[24];
+            snprintf(buf, sizeof(buf), "PAIRING %lu:%02lu",
+                     (unsigned long)(left / 60), (unsigned long)(left % 60));
+            return String(buf);
+        }
+        case BLE_MODE_ADVERTISING: {
+            uint32_t left = (bleModeUntil > millis()) ? (bleModeUntil - millis()) / 1000 : 0;
+            char buf[24];
+            snprintf(buf, sizeof(buf), "SEARCHING %lu:%02lu",
+                     (unsigned long)(left / 60), (unsigned long)(left % 60));
+            return String(buf);
+        }
+        default:
+            return "BLUETOOTH";
+    }
 }
 
 
@@ -1002,6 +1126,29 @@ void handleSettingsKey(char key) {
             qbindSlots[qbindEditSlot] = (qbindPickIdx == 0) ? -1 : (int8_t)(qbindPickIdx - 1);
             saveSettings();
             settingsView = SETTINGS_VIEW_QBIND_LIST;
+            drawMenu();
+            return;
+        }
+        return;
+    }
+
+    if (settingsView == SETTINGS_VIEW_BT) {
+        if (key == '8') {
+            if (btMenuIdx > 0) btMenuIdx--;
+            drawMenu();
+            return;
+        }
+        if (key == '2') {
+            if (btMenuIdx < BT_ITEM_COUNT - 1) btMenuIdx++;
+            drawMenu();
+            return;
+        }
+        if (key == '5' || key == '=') {
+            switch (btMenuIdx) {
+                case 0: bleStartPairing(); break;
+                case 1: bleStartAdvertising(); break;
+                case 2: bleShutdown(); hidBleClearAllBonds(); break;
+            }
             drawMenu();
             return;
         }
@@ -1165,6 +1312,7 @@ void goToSleep() {
     u8g2.drawStr(0, 32, "Sleeping...");
     u8g2.sendBuffer();
     delay(500);
+    bleShutdown();
     u8g2.setPowerSave(1);
     esp_sleep_enable_ext0_wakeup((gpio_num_t)WAKE_PIN, 0); // wake on LOW
     esp_deep_sleep_start();
@@ -1370,6 +1518,10 @@ void setup() {
     }
     prefs.end();
 
+    if (hidBleGetBondCount() > 0) {
+        bleStartAdvertising();
+    }
+
     lastActivity = millis();
     updateDisplay();
 }
@@ -1378,7 +1530,7 @@ void setup() {
 void loop() {
     char key = scanMatrix();
     if (!key) key = scanWakeKey();
-    
+
     if (key && key != lastKey) {
         handleKey(key);
     }
@@ -1388,6 +1540,17 @@ void loop() {
     if (messageUntil > 0 && millis() >= messageUntil) {
         messageUntil = 0;
         updateDisplay();
+    }
+
+    blePoll();
+
+    // refresh BT status countdown live while the BT page is open
+    static uint32_t lastBtTick = 0;
+    if (macro.state == MACRO_MENU && menuPage == MENU_PAGE_SETTINGS
+        && settingsView == SETTINGS_VIEW_BT
+        && millis() - lastBtTick > 1000) {
+        drawMenu();
+        lastBtTick = millis();
     }
 
     if (!numpadMode && millis() - lastActivity > sleepTimeoutMs) {
