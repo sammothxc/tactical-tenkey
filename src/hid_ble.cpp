@@ -1,6 +1,6 @@
 #include "hid_ble.h"
 #include <BleKeyboard.h>
-#include <NimBLEDevice.h>
+#include "esp_gap_ble_api.h"
 
 static BleKeyboard* bleKb = nullptr;
 static bool bleActive = false;
@@ -19,9 +19,8 @@ void hidBleInit(bool pairingMode) {
     bleKb->begin();
     bleActive = true;
 
-    // pairingMode currently informational only; T-vK BleKeyboard always
-    // advertises as bondable. A future revision can switch to whitelist-only
-    // when pairingMode == false (requires direct NimBLE advertising config).
+    // pairingMode is informational for now; T-vK BleKeyboard always
+    // advertises as bondable and accepts new pairings.
     (void)pairingMode;
 }
 
@@ -30,8 +29,6 @@ void hidBleDeinit() {
     if (!bleActive) return;
     if (bleKb) bleKb->end();
     bleActive = false;
-    // Free the controller for lowest-power state.
-    NimBLEDevice::deinit(true);
 }
 
 
@@ -47,65 +44,58 @@ bool hidBleIsConnected() {
 
 
 uint8_t hidBleGetBondCount() {
-    // NimBLEDevice::getNumBonds() requires the stack to be initialized.
-    // Init briefly if not active so we can query bonds at boot.
-    bool wasActive = bleActive;
-    if (!NimBLEDevice::getInitialized()) {
-        NimBLEDevice::init("Tactical Tenkey");
-    }
-    int n = NimBLEDevice::getNumBonds();
-    if (!wasActive) {
-        NimBLEDevice::deinit(true);
-    }
-    return (uint8_t)n;
+    int n = esp_ble_get_bond_device_num();
+    return n < 0 ? 0 : (uint8_t)n;
 }
 
 
 void hidBleClearAllBonds() {
-    bool wasActive = bleActive;
-    if (!NimBLEDevice::getInitialized()) {
-        NimBLEDevice::init("Tactical Tenkey");
+    int num = esp_ble_get_bond_device_num();
+    if (num <= 0) return;
+    esp_ble_bond_dev_t* list =
+        (esp_ble_bond_dev_t*)malloc(num * sizeof(esp_ble_bond_dev_t));
+    if (!list) return;
+    if (esp_ble_get_bond_device_list(&num, list) == ESP_OK) {
+        for (int i = 0; i < num; i++) {
+            esp_ble_remove_bond_device(list[i].bd_addr);
+        }
     }
-    NimBLEDevice::deleteAllBonds();
-    if (!wasActive) {
-        NimBLEDevice::deinit(true);
-    }
+    free(list);
 }
 
 
 String hidBleGetBondAddress(uint8_t index) {
-    bool wasActive = bleActive;
-    if (!NimBLEDevice::getInitialized()) {
-        NimBLEDevice::init("Tactical Tenkey");
-    }
+    int num = esp_ble_get_bond_device_num();
+    if ((int)index >= num || num <= 0) return String("");
+    esp_ble_bond_dev_t* list =
+        (esp_ble_bond_dev_t*)malloc(num * sizeof(esp_ble_bond_dev_t));
+    if (!list) return String("");
     String result = "";
-    int n = NimBLEDevice::getNumBonds();
-    if ((int)index < n) {
-        NimBLEAddress addr = NimBLEDevice::getBondedAddress(index);
-        result = String(addr.toString().c_str());
-        result.toUpperCase();
+    if (esp_ble_get_bond_device_list(&num, list) == ESP_OK) {
+        char buf[18];
+        snprintf(buf, sizeof(buf),
+                 "%02X:%02X:%02X:%02X:%02X:%02X",
+                 list[index].bd_addr[0], list[index].bd_addr[1],
+                 list[index].bd_addr[2], list[index].bd_addr[3],
+                 list[index].bd_addr[4], list[index].bd_addr[5]);
+        result = String(buf);
     }
-    if (!wasActive) {
-        NimBLEDevice::deinit(true);
-    }
+    free(list);
     return result;
 }
 
 
 bool hidBleDeleteBond(uint8_t index) {
-    bool wasActive = bleActive;
-    if (!NimBLEDevice::getInitialized()) {
-        NimBLEDevice::init("Tactical Tenkey");
-    }
+    int num = esp_ble_get_bond_device_num();
+    if ((int)index >= num || num <= 0) return false;
+    esp_ble_bond_dev_t* list =
+        (esp_ble_bond_dev_t*)malloc(num * sizeof(esp_ble_bond_dev_t));
+    if (!list) return false;
     bool ok = false;
-    int n = NimBLEDevice::getNumBonds();
-    if ((int)index < n) {
-        NimBLEAddress addr = NimBLEDevice::getBondedAddress(index);
-        ok = NimBLEDevice::deleteBond(addr);
+    if (esp_ble_get_bond_device_list(&num, list) == ESP_OK) {
+        ok = (esp_ble_remove_bond_device(list[index].bd_addr) == ESP_OK);
     }
-    if (!wasActive) {
-        NimBLEDevice::deinit(true);
-    }
+    free(list);
     return ok;
 }
 
