@@ -572,6 +572,7 @@ void handleKey(char key) {
         if (macroInput(value)) {
             displayValue = formatResult(macro.result);
             macro.state = MACRO_IDLE;
+            functionName = "";
         } else {
             displayValue = "0";
         }
