@@ -42,15 +42,15 @@ static const char* GUIDE_BASIC[] = {
 };
 static const char* GUIDE_MACRO_MENU[] = {
     "MACRO MENU",
-    "Tap [-]+[0] together",
+    "Tap [-]+[5] together",
     "and release to open",
     "the macro menu.",
+    "[4]/[6] page between",
+    "Macros, Settings, BT.",
     "In the menu:",
     "[8]/[2] scroll",
     "[5]/[Enter] select",
     "[NUM] cancel",
-    "Macros then prompt",
-    "for each input.",
 };
 static const char* GUIDE_NUMPAD[] = {
     "NUMPAD MODE",
@@ -87,7 +87,7 @@ static const char* GUIDE_SEND[] = {
 static const char* GUIDE_SLEEP[] = {
     "AUTO SLEEP",
     "Device sleeps after",
-    "60 seconds idle.",
+    "5 minutes idle.",
     "Press [Enter] to",
     "wake.",
 };
@@ -129,7 +129,7 @@ enum GuideAction {
 #define LED_PIN 21
 #define SCL_PIN 6
 #define WAKE_PIN 1 // Enter key
-#define SLEEP_TIMEOUT 60000
+#define DEFAULT_SLEEP_TIMEOUT 300000
 
 const uint8_t ROW_PINS[4] = {42, 2, 4, 43};
 const uint8_t COL_PINS[4] = {9, 8, 7, 44};
@@ -158,6 +158,51 @@ bool numLockOn = true;
 String functionName = "";
 uint32_t messageUntil = 0;
 
+enum MenuPage {
+    MENU_PAGE_MACROS = 0,
+    MENU_PAGE_SETTINGS,
+    MENU_PAGE_BT,
+    MENU_PAGE_COUNT
+};
+uint8_t menuPage = MENU_PAGE_MACROS;
+
+// persistent settings
+uint32_t sleepTimeoutMs = DEFAULT_SLEEP_TIMEOUT;
+uint8_t oledContrast = 255;
+uint8_t ledBrightness = 255;
+
+// settings page sub-views
+enum SettingsView {
+    SETTINGS_VIEW_LIST = 0,
+    SETTINGS_VIEW_TIMEOUT,
+    SETTINGS_VIEW_CONTRAST,
+    SETTINGS_VIEW_BRIGHTNESS,
+    SETTINGS_VIEW_FW_INFO,
+    SETTINGS_VIEW_QBIND_LIST,
+    SETTINGS_VIEW_QBIND_PICK
+};
+SettingsView settingsView = SETTINGS_VIEW_LIST;
+uint8_t settingsIndex = 0;
+String settingsInput = "";
+
+// macro quick bind: slot index holds a macro index, -1 = unbound
+// (slot 5 unused: -+5 is the FN chord)
+int8_t qbindSlots[10] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+const uint8_t QBIND_VALID_SLOTS[9] = {0, 1, 2, 3, 4, 6, 7, 8, 9};
+uint8_t qbindListIdx = 0;     // selection within QBIND_LIST (0..8 -> QBIND_VALID_SLOTS[idx])
+uint8_t qbindEditSlot = 0;    // slot being edited in QBIND_PICK
+uint8_t qbindPickIdx = 0;     // selection in QBIND_PICK (0 = None, 1..MACRO_COUNT = macro)
+
+const char* SETTINGS_NAMES[] = {
+    "Sleep Timeout",
+    "Contrast",
+    "Brightness",
+    "Quick Bind",
+    "Show Guide",
+    "FW Info"
+};
+const uint8_t SETTINGS_COUNT = sizeof(SETTINGS_NAMES) / sizeof(SETTINGS_NAMES[0]);
+
 // combo tracking
 bool minusHeld = false;
 bool zeroHeld = false;
@@ -172,7 +217,13 @@ char scanWakeKey();
 void handleKey(char key);
 void showBootScreen();
 void introMode();
-void drawMacroMenu();
+void drawMenu();
+void drawMenuHeader(const char* title);
+void drawMacroPage();
+void drawSettingsPage();
+void drawBTPage();
+void saveSettings();
+void handleSettingsKey(char key);
 void drawTopBar();
 void drawBottomBar();
 void drawMainDisplay();
@@ -203,7 +254,6 @@ void initMatrix() {
 char scanMatrix() {
     char pressed = 0;
     bool currentMinus = false;
-    bool currentZero = false;
     bool currentEight = false;
     bool currentTwo = false;
     bool currentFive = false;
@@ -219,7 +269,6 @@ char scanMatrix() {
             if (digitalRead(COL_PINS[col]) == LOW) {
                 char key = KEYMAP[row][col];
                 if (key == '-') currentMinus = true;
-                else if (key == '0') currentZero = true;
                 else if (key == '8') currentEight = true;
                 else if (key == '2') currentTwo = true;
                 else if (key == '5') currentFive = true;
@@ -231,23 +280,23 @@ char scanMatrix() {
         }
         digitalWrite(ROW_PINS[row], HIGH);
     }
-    
-    bool fnPressed = currentMinus && currentZero;
 
-    // edge detection for minus/zero release-fire
+    bool fnPressed = currentMinus && currentFive;
+
+    // edge detection for minus/five release-fire
     static bool prevMinus = false;
-    static bool prevZero = false;
+    static bool prevFive = false;
     static bool minusFnUsed = false;
-    static bool zeroFnUsed = false;
+    static bool fiveFnUsed = false;
     bool minusReleased = prevMinus && !currentMinus;
-    bool zeroReleased  = prevZero  && !currentZero;
+    bool fiveReleased  = prevFive  && !currentFive;
     prevMinus = currentMinus;
-    prevZero  = currentZero;
+    prevFive  = currentFive;
 
     // while FN chord active, mark both keys as "used for FN"
     if (fnPressed) {
         minusFnUsed = true;
-        zeroFnUsed = true;
+        fiveFnUsed = true;
     }
 
     // track FN tap: true while FN is held and nothing else has been pressed
@@ -258,8 +307,9 @@ char scanMatrix() {
         fnComboFired = false;
     }
     // any non-FN key pressed during FN cancels the tap
+    // (0 lives in `pressed`; 8/2 are tracked specially)
     if (fnPressed && (currentSlash || currentStar || currentClear
-                      || currentFive || currentEight || currentTwo
+                      || currentEight || currentTwo
                       || pressed != 0)) {
         fnComboFired = true;
     }
@@ -283,9 +333,9 @@ char scanMatrix() {
         wasFn = false;
         bool wasTap = !fnComboFired;
         fnComboFired = false;
-        // consume release events so - and 0 don't fire on release
+        // consume release events so - and 5 don't fire on release
         if (minusReleased) { minusReleased = false; minusFnUsed = false; }
-        if (zeroReleased)  { zeroReleased  = false; zeroFnUsed  = false; }
+        if (fiveReleased)  { fiveReleased  = false; fiveFnUsed  = false; }
         if (wasTap && macro.state == MACRO_IDLE) {
             macroMenuOpen();
             return 'M';
@@ -311,22 +361,34 @@ char scanMatrix() {
     }
     if (!currentMinus || !currentStar) minusStarChord = false;
 
-    // minus/zero fire on release, and only if they weren't part of an FN chord
+    // FN + digit (0-9 except 5) = quick-bind macro trigger
+    // (8/2 tracked separately; 0 lives in `pressed`; 5 is part of FN itself)
+    if (fnPressed) {
+        char qbDigit = 0;
+        if (pressed >= '0' && pressed <= '9') qbDigit = pressed;
+        else if (currentEight) qbDigit = '8';
+        else if (currentTwo)   qbDigit = '2';
+
+        if (qbDigit && qbDigit != '5') {
+            return (char)(0x10 + (qbDigit - '0'));  // 0x10..0x19, skipping 0x15
+        }
+    }
+
+    // minus/five fire on release, and only if they weren't part of an FN chord
     if (minusReleased) {
         bool wasSolo = !minusFnUsed;
         minusFnUsed = false;
         if (wasSolo) return '-';
     }
-    if (zeroReleased) {
-        bool wasSolo = !zeroFnUsed;
-        zeroFnUsed = false;
-        if (wasSolo) return '0';
+    if (fiveReleased) {
+        bool wasSolo = !fiveFnUsed;
+        fiveFnUsed = false;
+        if (wasSolo) return '5';
     }
 
     // other single keys fire on press (suppress / and * while - is held)
     if (currentEight) return '8';
     if (currentTwo) return '2';
-    if (currentFive) return '5';
     if (currentSlash && !currentMinus) return '/';
     if (currentStar && !currentMinus) return '*';
     if (currentClear) return 'C';
@@ -349,34 +411,95 @@ void handleKey(char key) {
 
     // menu just opened
     if (key == 'M') {
-        drawMacroMenu();
+        menuPage = MENU_PAGE_MACROS;
+        settingsView = SETTINGS_VIEW_LIST;
+        settingsInput = "";
+        drawMenu();
         return;
     }
 
-    // while menu is open, keys are modal: 8/2 nav, 5 select, C cancel
+    // while menu is open, keys are modal: 4/6 page, 8/2 nav, 5 select, C cancel
     if (macro.state == MACRO_MENU) {
-        if (key == '8') {
-            macroMenuUp();
-            drawMacroMenu();
+        // settings sub-views consume all input (C backs to settings list)
+        if (menuPage == MENU_PAGE_SETTINGS && settingsView != SETTINGS_VIEW_LIST) {
+            handleSettingsKey(key);
             return;
         }
-        if (key == '2') {
-            macroMenuDown();
-            drawMacroMenu();
+
+        if (key == '4') {
+            menuPage = (menuPage + MENU_PAGE_COUNT - 1) % MENU_PAGE_COUNT;
+            drawMenu();
             return;
         }
-        if (key == '5' || key == '=') {
-            macroMenuSelect();
-            functionName = macro.functionName;
-            displayValue = "0";
-            newEntry = true;
-            updateDisplay();
+        if (key == '6') {
+            menuPage = (menuPage + 1) % MENU_PAGE_COUNT;
+            drawMenu();
             return;
         }
         if (key == 'C') {
             macro.state = MACRO_IDLE;
+            settingsView = SETTINGS_VIEW_LIST;
+            settingsInput = "";
             updateDisplay();
             return;
+        }
+
+        if (menuPage == MENU_PAGE_MACROS) {
+            if (key == '8') {
+                macroMenuUp();
+                drawMenu();
+                return;
+            }
+            if (key == '2') {
+                macroMenuDown();
+                drawMenu();
+                return;
+            }
+            if (key == '5' || key == '=') {
+                macroMenuSelect();
+                functionName = macro.functionName;
+                displayValue = "0";
+                newEntry = true;
+                updateDisplay();
+                return;
+            }
+        }
+        else if (menuPage == MENU_PAGE_SETTINGS) {
+            if (key == '8') {
+                if (settingsIndex > 0) settingsIndex--;
+                drawMenu();
+                return;
+            }
+            if (key == '2') {
+                if (settingsIndex < SETTINGS_COUNT - 1) settingsIndex++;
+                drawMenu();
+                return;
+            }
+            if (key == '5' || key == '=') {
+                switch (settingsIndex) {
+                    case 0: // Sleep Timeout
+                        settingsView = SETTINGS_VIEW_TIMEOUT;
+                        settingsInput = "";
+                        break;
+                    case 1: // Contrast
+                        settingsView = SETTINGS_VIEW_CONTRAST;
+                        break;
+                    case 2: // Brightness
+                        settingsView = SETTINGS_VIEW_BRIGHTNESS;
+                        break;
+                    case 3: // Quick Bind
+                        settingsView = SETTINGS_VIEW_QBIND_LIST;
+                        break;
+                    case 4: // Show Guide
+                        showGuide();
+                        break;
+                    case 5: // FW Info
+                        settingsView = SETTINGS_VIEW_FW_INFO;
+                        break;
+                }
+                drawMenu();
+                return;
+            }
         }
         return; // ignore other keys while menu is open
     }
@@ -404,7 +527,24 @@ void handleKey(char key) {
         updateDisplay();
         return;
     }
-    
+
+    // quick-bind macro trigger: FN+digit (0-9 except 5)
+    if (key >= 0x10 && key <= 0x19) {
+        if (numpadMode || macro.state != MACRO_IDLE) return;
+        uint8_t slot = key - 0x10;
+        if (slot == 5) return;
+        int8_t macroIdx = qbindSlots[slot];
+        if (macroIdx < 0 || macroIdx >= (int8_t)MACRO_COUNT) return;
+        macroStart(MACRO_NAMES[macroIdx]);
+        functionName = macro.functionName;
+        displayValue = "0";
+        storedValue = "";
+        pendingOp = 0;
+        newEntry = true;
+        updateDisplay();
+        return;
+    }
+
     // NUMPAD MODE - send keys to computer, don't touch display
     if (numpadMode) {
         if (key == 'C') {
@@ -485,6 +625,9 @@ void handleKey(char key) {
         } else if (storedValue.length() > 0 || pendingOp) {
             storedValue = "";
             pendingOp = 0;
+        } else if (macro.state == MACRO_AWAITING_INPUT) {
+            macroCancel();
+            functionName = "";
         } else if (functionName.length() > 0) {
             functionName = "";
         }
@@ -514,24 +657,31 @@ void welcomeText() {
 }
 
 
-void drawMacroMenu() {
-    u8g2.clearBuffer();
-    
+void drawMenuHeader(const char* title) {
     u8g2.setFont(u8g2_font_6x10_tr);
-    u8g2.drawStr(0, 10, "SELECT MACRO");
-    
+    int16_t titleWidth = u8g2.getStrWidth(title);
+    int16_t titleX = (128 - titleWidth) / 2;
+    u8g2.drawStr(titleX, 10, title);
+    u8g2.drawStr(0, 10, "<");
+    u8g2.drawStr(122, 10, ">");
+}
+
+
+void drawMacroPage() {
+    drawMenuHeader("MACROS");
+
     // show 3 items centered on current selection
     int startIdx = menuIndex - 1;
     if (startIdx < 0) startIdx = 0;
     if (startIdx > MACRO_COUNT - 3) startIdx = MACRO_COUNT - 3;
     if (MACRO_COUNT <= 3) startIdx = 0;
-    
+
+    u8g2.setFont(u8g2_font_6x10_tr);
     for (int i = 0; i < 3 && (startIdx + i) < MACRO_COUNT; i++) {
         int idx = startIdx + i;
-        int y = 28 + (i * 14);
-        
+        int y = 25 + (i * 14);
+
         if (idx == menuIndex) {
-            // highlight selected
             u8g2.drawBox(0, y - 10, 128, 14);
             u8g2.setDrawColor(0);
             u8g2.drawStr(4, y, MACRO_NAMES[idx]);
@@ -541,7 +691,293 @@ void drawMacroMenu() {
         }
     }
     u8g2.setFont(u8g2_font_5x7_tr);
-    u8g2.drawStr(0, 64, "[8][2]Nav [5]Sel [NUM]Bk");
+    u8g2.drawStr(0, 64, "[4][6]Pg [5]Sel [NUM]Bk");
+}
+
+
+static void drawSettingsList() {
+    int startIdx = settingsIndex - 1;
+    if (startIdx < 0) startIdx = 0;
+    if (startIdx > SETTINGS_COUNT - 3) startIdx = SETTINGS_COUNT - 3;
+    if (SETTINGS_COUNT <= 3) startIdx = 0;
+
+    u8g2.setFont(u8g2_font_6x10_tr);
+    for (int i = 0; i < 3 && (startIdx + i) < SETTINGS_COUNT; i++) {
+        int idx = startIdx + i;
+        int y = 25 + (i * 14);
+        if (idx == settingsIndex) {
+            u8g2.drawBox(0, y - 10, 128, 14);
+            u8g2.setDrawColor(0);
+            u8g2.drawStr(4, y, SETTINGS_NAMES[idx]);
+            u8g2.setDrawColor(1);
+        } else {
+            u8g2.drawStr(4, y, SETTINGS_NAMES[idx]);
+        }
+    }
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 64, "[4][6]Pg [5]Sel [NUM]Bk");
+}
+
+static void drawTimeoutEntry() {
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr(0, 28, "Sleep (min):");
+    String shown = settingsInput.length() > 0 ? settingsInput : String(sleepTimeoutMs / 60000);
+    shown += "_";
+    u8g2.drawStr(0, 46, shown.c_str());
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 64, "[*]Bksp [=]Sv [NUM]Bk");
+}
+
+static void drawSlider(const char* label, uint8_t value) {
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr(0, 28, label);
+    char buf[8];
+    snprintf(buf, sizeof(buf), "%u", value);
+    u8g2.drawStr(0, 46, buf);
+    // bar: 0..255 mapped to 0..120 px
+    int16_t barW = (int16_t)((uint16_t)value * 120 / 255);
+    u8g2.drawFrame(0, 50, 122, 6);
+    u8g2.drawBox(1, 51, barW, 4);
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 64, "[8/2]+-10 [4/6]+-1 [=]Sv");
+}
+
+static void drawQbindList() {
+    // 9 valid slots, show 3 centered on current selection
+    int total = 9;
+    int startIdx = (int)qbindListIdx - 1;
+    if (startIdx < 0) startIdx = 0;
+    if (startIdx > total - 3) startIdx = total - 3;
+
+    u8g2.setFont(u8g2_font_6x10_tr);
+    char row[24];
+    for (int i = 0; i < 3 && (startIdx + i) < total; i++) {
+        int idx = startIdx + i;
+        uint8_t slot = QBIND_VALID_SLOTS[idx];
+        int8_t mi = qbindSlots[slot];
+        const char* name = (mi >= 0 && mi < (int8_t)MACRO_COUNT) ? MACRO_NAMES[mi] : "(none)";
+        snprintf(row, sizeof(row), "FN+%u: %s", slot, name);
+
+        int y = 25 + (i * 14);
+        if (idx == (int)qbindListIdx) {
+            u8g2.drawBox(0, y - 10, 128, 14);
+            u8g2.setDrawColor(0);
+            u8g2.drawStr(4, y, row);
+            u8g2.setDrawColor(1);
+        } else {
+            u8g2.drawStr(4, y, row);
+        }
+    }
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 64, "[8/2]Nav [5]Sel [NUM]Bk");
+}
+
+static void drawQbindPick() {
+    // pick list: 0 = "(none)", 1..MACRO_COUNT = macros
+    int total = MACRO_COUNT + 1;
+    int startIdx = (int)qbindPickIdx - 1;
+    if (startIdx < 0) startIdx = 0;
+    if (startIdx > total - 3) startIdx = total - 3;
+    if (total <= 3) startIdx = 0;
+
+    u8g2.setFont(u8g2_font_6x10_tr);
+    for (int i = 0; i < 3 && (startIdx + i) < total; i++) {
+        int idx = startIdx + i;
+        const char* name = (idx == 0) ? "(none)" : MACRO_NAMES[idx - 1];
+        int y = 25 + (i * 14);
+        if (idx == (int)qbindPickIdx) {
+            u8g2.drawBox(0, y - 10, 128, 14);
+            u8g2.setDrawColor(0);
+            u8g2.drawStr(4, y, name);
+            u8g2.setDrawColor(1);
+        } else {
+            u8g2.drawStr(4, y, name);
+        }
+    }
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 64, "[8/2]Nav [5]Save [NUM]Bk");
+}
+
+static void drawFwInfo() {
+    u8g2.setFont(u8g2_font_6x10_tr);
+    u8g2.drawStr(0, 24, "Tactical Tenkey");
+    u8g2.setFont(u8g2_font_5x7_tr);
+    String v = String("Version: ") + FW_VERSION;
+    u8g2.drawStr(0, 38, v.c_str());
+    String d = String("Built:   ") + FW_DATE;
+    u8g2.drawStr(0, 48, d.c_str());
+    u8g2.drawStr(0, 64, "[NUM] Back");
+}
+
+void drawSettingsPage() {
+    if (settingsView == SETTINGS_VIEW_LIST) {
+        drawMenuHeader("SETTINGS");
+        drawSettingsList();
+        return;
+    }
+    // sub-view: plain header (no L/R arrows since page nav is locked out)
+    u8g2.setFont(u8g2_font_6x10_tr);
+    if (settingsView == SETTINGS_VIEW_QBIND_PICK) {
+        char hdr[16];
+        snprintf(hdr, sizeof(hdr), "BIND FN+%u", qbindEditSlot);
+        u8g2.drawStr(0, 10, hdr);
+    } else {
+        u8g2.drawStr(0, 10, "SETTINGS");
+    }
+    u8g2.drawHLine(0, 12, 128);
+    switch (settingsView) {
+        case SETTINGS_VIEW_TIMEOUT:     drawTimeoutEntry(); break;
+        case SETTINGS_VIEW_CONTRAST:    drawSlider("Contrast:",   oledContrast);  break;
+        case SETTINGS_VIEW_BRIGHTNESS:  drawSlider("Brightness:", ledBrightness); break;
+        case SETTINGS_VIEW_FW_INFO:     drawFwInfo(); break;
+        case SETTINGS_VIEW_QBIND_LIST:  drawQbindList(); break;
+        case SETTINGS_VIEW_QBIND_PICK:  drawQbindPick(); break;
+        default: break;
+    }
+}
+
+
+void saveSettings() {
+    Preferences p;
+    p.begin("t2", false);
+    p.putULong("sleepMs", sleepTimeoutMs);
+    p.putUChar("contrast", oledContrast);
+    p.putUChar("ledBri", ledBrightness);
+    p.putBytes("qbind", qbindSlots, sizeof(qbindSlots));
+    p.end();
+}
+
+
+void handleSettingsKey(char key) {
+    if (key == 'C') {
+        settingsView = SETTINGS_VIEW_LIST;
+        settingsInput = "";
+        drawMenu();
+        return;
+    }
+
+    if (settingsView == SETTINGS_VIEW_TIMEOUT) {
+        if (key >= '0' && key <= '9') {
+            if (settingsInput.length() < 4) settingsInput += key;
+            drawMenu();
+            return;
+        }
+        if (key == '*') {
+            if (settingsInput.length() > 0) {
+                settingsInput.remove(settingsInput.length() - 1);
+            }
+            drawMenu();
+            return;
+        }
+        if (key == '=') {
+            if (settingsInput.length() > 0) {
+                uint32_t mins = settingsInput.toInt();
+                if (mins == 0) mins = 1; // floor at 1 minute
+                sleepTimeoutMs = mins * 60000UL;
+                saveSettings();
+            }
+            settingsView = SETTINGS_VIEW_LIST;
+            settingsInput = "";
+            drawMenu();
+            return;
+        }
+        return;
+    }
+
+    if (settingsView == SETTINGS_VIEW_CONTRAST || settingsView == SETTINGS_VIEW_BRIGHTNESS) {
+        uint8_t* val = (settingsView == SETTINGS_VIEW_CONTRAST) ? &oledContrast : &ledBrightness;
+        int delta = 0;
+        if (key == '8') delta = 10;
+        else if (key == '2') delta = -10;
+        else if (key == '6') delta = 1;
+        else if (key == '4') delta = -1;
+        else if (key == '=') {
+            saveSettings();
+            settingsView = SETTINGS_VIEW_LIST;
+            drawMenu();
+            return;
+        }
+        if (delta != 0) {
+            int next = (int)*val + delta;
+            if (next < 0) next = 0;
+            if (next > 255) next = 255;
+            *val = (uint8_t)next;
+            if (settingsView == SETTINGS_VIEW_CONTRAST) {
+                u8g2.setContrast(oledContrast);
+            } else {
+                analogWrite(LED_PIN, ledBrightness);
+            }
+            drawMenu();
+        }
+        return;
+    }
+
+    if (settingsView == SETTINGS_VIEW_QBIND_LIST) {
+        if (key == '8') {
+            if (qbindListIdx > 0) qbindListIdx--;
+            drawMenu();
+            return;
+        }
+        if (key == '2') {
+            if (qbindListIdx < 8) qbindListIdx++;
+            drawMenu();
+            return;
+        }
+        if (key == '5' || key == '=') {
+            qbindEditSlot = QBIND_VALID_SLOTS[qbindListIdx];
+            int8_t cur = qbindSlots[qbindEditSlot];
+            qbindPickIdx = (cur < 0) ? 0 : (uint8_t)(cur + 1);
+            settingsView = SETTINGS_VIEW_QBIND_PICK;
+            drawMenu();
+            return;
+        }
+        return;
+    }
+
+    if (settingsView == SETTINGS_VIEW_QBIND_PICK) {
+        int total = MACRO_COUNT + 1;
+        if (key == '8') {
+            if (qbindPickIdx > 0) qbindPickIdx--;
+            drawMenu();
+            return;
+        }
+        if (key == '2') {
+            if (qbindPickIdx < total - 1) qbindPickIdx++;
+            drawMenu();
+            return;
+        }
+        if (key == '5' || key == '=') {
+            qbindSlots[qbindEditSlot] = (qbindPickIdx == 0) ? -1 : (int8_t)(qbindPickIdx - 1);
+            saveSettings();
+            settingsView = SETTINGS_VIEW_QBIND_LIST;
+            drawMenu();
+            return;
+        }
+        return;
+    }
+
+    // SETTINGS_VIEW_FW_INFO: only C exits (handled above)
+}
+
+
+void drawBTPage() {
+    drawMenuHeader("BLUETOOTH");
+    u8g2.setFont(u8g2_font_6x10_tr);
+    const char* msg = "(coming soon)";
+    int16_t w = u8g2.getStrWidth(msg);
+    u8g2.drawStr((128 - w) / 2, 38, msg);
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 64, "[4][6]Pg [NUM]Bk");
+}
+
+
+void drawMenu() {
+    u8g2.clearBuffer();
+    switch (menuPage) {
+        case MENU_PAGE_MACROS:   drawMacroPage();    break;
+        case MENU_PAGE_SETTINGS: drawSettingsPage(); break;
+        case MENU_PAGE_BT:       drawBTPage();       break;
+    }
     u8g2.sendBuffer();
 }
 
@@ -842,23 +1278,31 @@ void showChangelog() {
 void setup() {
     pinMode(WAKE_PIN, INPUT_PULLUP);
     pinMode(LED_PIN, OUTPUT);
-    digitalWrite(LED_PIN, HIGH);
     initMatrix();
     Wire.begin(SDA_PIN, SCL_PIN);
     u8g2.begin();
-    u8g2.setContrast(255);
     u8g2.setFlipMode(1); // rotate display 180 degrees
+
+    Preferences prefs;
+    prefs.begin("t2", false);
+
+    sleepTimeoutMs = prefs.getULong("sleepMs", DEFAULT_SLEEP_TIMEOUT);
+    oledContrast   = prefs.getUChar("contrast", 255);
+    ledBrightness  = prefs.getUChar("ledBri",   255);
+    if (prefs.isKey("qbind")) {
+        prefs.getBytes("qbind", qbindSlots, sizeof(qbindSlots));
+    }
+    u8g2.setContrast(oledContrast);
+    analogWrite(LED_PIN, ledBrightness);
+
     esp_sleep_wakeup_cause_t wakeup = esp_sleep_get_wakeup_cause();
     if (wakeup == ESP_SLEEP_WAKEUP_UNDEFINED) {
-        Preferences prefs;
-        prefs.begin("t2", false);
-        
         bool firstBoot = prefs.getBool("guided", false) == false;
         String lastRelease = prefs.getString("fwRel", "");
 #ifdef FORCE_FIRST_BOOT
         firstBoot = true;
 #endif
-        
+
         if (firstBoot) {
             showBootScreen();
             welcomeText();
@@ -872,9 +1316,9 @@ void setup() {
         } else {
             showBootScreen();
         }
-        
-        prefs.end();
     }
+    prefs.end();
+
     lastActivity = millis();
     updateDisplay();
 }
@@ -895,7 +1339,7 @@ void loop() {
         updateDisplay();
     }
 
-    if (!numpadMode && millis() - lastActivity > SLEEP_TIMEOUT) {
+    if (!numpadMode && millis() - lastActivity > sleepTimeoutMs) {
         goToSleep();
     }
     delay(20);
