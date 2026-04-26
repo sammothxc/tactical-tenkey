@@ -33,11 +33,3 @@ with open("include/version.h", "w") as f:
     f.write(f'#define FW_VERSION "{version}"\n')
     f.write(f'#define FW_RELEASE "{release}"\n')
     f.write(f'#define FW_DATE "{today}"\n')
-
-os.makedirs("firmware", exist_ok=True)
-
-def copy_bin(source, target, env):
-    shutil.copy(str(target[0]), "firmware/firmware.bin")
-    print(f">> Copied firmware to firmware/firmware.bin (v{version})")
-
-env.AddPostAction("$BUILD_DIR/firmware.bin", copy_bin)
