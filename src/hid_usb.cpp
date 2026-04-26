@@ -2,6 +2,8 @@
 #include "USB.h"
 #include "USBHIDKeyboard.h"
 
+extern uint8_t zoomModifier;  // defined in main.cpp: 0 = Ctrl, 1 = Cmd/GUI
+
 static USBHIDKeyboard Keyboard;
 static bool usbStarted = false;
 
@@ -73,7 +75,18 @@ void hidUsbSendNumpadKey(char key, bool numLockOn) {
             default: return;
         }
     } else {
-        // numlock off: digits become nav cluster; / and * become Tab and Backspace
+        // numlock off: digits become nav cluster; / and * become Tab and Backspace;
+        // + and - send Ctrl+Plus / Ctrl+Minus (zoom in/out)
+        if (key == '+' || key == '-') {
+            uint8_t k = (key == '+') ? KEY_NUMPAD_PLUS : KEY_NUMPAD_MINUS;
+            uint8_t mod = (zoomModifier == 1) ? KEY_LEFT_GUI : KEY_LEFT_CTRL;
+            Keyboard.press(mod);
+            Keyboard.pressRaw(k);
+            delay(10);
+            Keyboard.releaseRaw(k);
+            Keyboard.releaseAll();
+            return;
+        }
         switch (key) {
             case '0': keycode = KEY_HID_INSERT; break;
             case '1': keycode = KEY_HID_END; break;
@@ -88,8 +101,6 @@ void hidUsbSendNumpadKey(char key, bool numLockOn) {
             case '.': keycode = KEY_HID_DELETE; break;
             case '/': keycode = KEY_HID_TAB; break;
             case '*': keycode = KEY_HID_BACKSPACE; break;
-            case '+': keycode = KEY_NUMPAD_PLUS; break;
-            case '-': keycode = KEY_NUMPAD_MINUS; break;
             case '=': keycode = KEY_NUMPAD_ENTER; break;
             default: return;
         }
@@ -98,6 +109,7 @@ void hidUsbSendNumpadKey(char key, bool numLockOn) {
     Keyboard.pressRaw(keycode);
     delay(10);
     Keyboard.releaseRaw(keycode);
+    Keyboard.releaseAll();  // guard against stuck modifier/key bits in the report
 }
 
 
@@ -106,6 +118,7 @@ void hidUsbSendString(const String& str) {
     for (int i = 0; i < str.length(); i++) {
         char c = str.charAt(i);
         Keyboard.print(c);
+        Keyboard.releaseAll();
         delay(10);
     }
 }

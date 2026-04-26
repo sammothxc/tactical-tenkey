@@ -1,6 +1,12 @@
 #include "hid_ble.h"
 #include <BleKeyboard.h>
+#include <BLEDevice.h>
+#include <BLEAdvertising.h>
 #include "esp_gap_ble_api.h"
+
+extern uint8_t zoomModifier;  // defined in main.cpp: 0 = Ctrl, 1 = Cmd/GUI
+
+static const char* BLE_DEVICE_NAME = "Tactical Tenkey";
 
 static BleKeyboard* bleKb = nullptr;
 static bool bleActive = false;
@@ -8,7 +14,7 @@ static bool bleActive = false;
 
 static void ensureKb() {
     if (bleKb == nullptr) {
-        bleKb = new BleKeyboard("Tactical Tenkey", "Tactical Tenkey", 100);
+        bleKb = new BleKeyboard(BLE_DEVICE_NAME, "Tactical Tenkey", 100);
     }
 }
 
@@ -17,6 +23,50 @@ void hidBleInit(bool pairingMode) {
     if (bleActive) return;
     ensureKb();
     bleKb->begin();
+
+    // Use the public BLE MAC instead of a rotating random one. Some hosts
+    // (Windows BT stack notably) treat each rotated address as a new nameless
+    // device, which is what causes "shows on iPhone, MAC-only on PC".
+    esp_ble_gap_config_local_privacy(false);
+
+    // T-vK BleKeyboard suppresses the scan response, which is normally
+    // where the device name rides. Set the GAP name at the controller and
+    // also embed the name in the primary advertising packet so hosts see
+    // "Tactical Tenkey" instead of a raw MAC.
+    esp_ble_gap_set_device_name(BLE_DEVICE_NAME);
+
+    // Explicit SMP config: Secure Connections + bonding, no MITM, IO=None.
+    // This produces clean "just-works" pairing that Linux BlueZ accepts for
+    // HID. T-vK's defaults often trip BlueZ's "AuthenticationCanceled".
+    esp_ble_auth_req_t auth_req = ESP_LE_AUTH_REQ_SC_BOND;
+    esp_ble_io_cap_t iocap = ESP_IO_CAP_NONE;
+    uint8_t key_size = 16;
+    uint8_t init_key = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
+    uint8_t rsp_key  = ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK;
+    esp_ble_gap_set_security_param(ESP_BLE_SM_AUTHEN_REQ_MODE, &auth_req, sizeof(auth_req));
+    esp_ble_gap_set_security_param(ESP_BLE_SM_IOCAP_MODE,      &iocap,    sizeof(iocap));
+    esp_ble_gap_set_security_param(ESP_BLE_SM_MAX_KEY_SIZE,    &key_size, sizeof(key_size));
+    esp_ble_gap_set_security_param(ESP_BLE_SM_SET_INIT_KEY,    &init_key, sizeof(init_key));
+    esp_ble_gap_set_security_param(ESP_BLE_SM_SET_RSP_KEY,     &rsp_key,  sizeof(rsp_key));
+
+    BLEAdvertising* adv = BLEDevice::getAdvertising();
+    if (adv) {
+        adv->stop();
+
+        BLEAdvertisementData advData;
+        advData.setFlags(0x06);  // LE general discoverable + BR/EDR not supported
+        advData.setName(BLE_DEVICE_NAME);
+        advData.setAppearance(0x03C1);  // HID Keyboard
+        adv->setAdvertisementData(advData);
+
+        BLEAdvertisementData scanRsp;
+        scanRsp.setCompleteServices(BLEUUID((uint16_t)0x1812));  // HID service
+        adv->setScanResponseData(scanRsp);
+        adv->setScanResponse(true);
+
+        adv->start();
+    }
+
     bleActive = true;
 
     // pairingMode is informational for now; T-vK BleKeyboard always
@@ -125,6 +175,17 @@ void hidBleSendNumpadKey(char key, bool numLockOn) {
             default: return;
         }
     } else {
+        // + and - send Ctrl+Plus / Ctrl+Minus (zoom in/out)
+        if (key == '+' || key == '-') {
+            uint8_t k = (key == '+') ? KEY_NUM_PLUS : KEY_NUM_MINUS;
+            uint8_t mod = (zoomModifier == 1) ? KEY_LEFT_GUI : KEY_LEFT_CTRL;
+            bleKb->press(mod);
+            bleKb->press(k);
+            delay(10);
+            bleKb->release(k);
+            bleKb->releaseAll();
+            return;
+        }
         switch (key) {
             case '0': code = KEY_INSERT;     break;
             case '1': code = KEY_END;        break;
@@ -139,8 +200,6 @@ void hidBleSendNumpadKey(char key, bool numLockOn) {
             case '.': code = KEY_DELETE;     break;
             case '/': code = KEY_TAB;        break;
             case '*': code = KEY_BACKSPACE;  break;
-            case '+': code = KEY_NUM_PLUS;   break;
-            case '-': code = KEY_NUM_MINUS;  break;
             case '=': code = KEY_NUM_ENTER;  break;
             default: return;
         }
@@ -149,6 +208,7 @@ void hidBleSendNumpadKey(char key, bool numLockOn) {
     bleKb->press(code);
     delay(10);
     bleKb->release(code);
+    bleKb->releaseAll();  // guard against stuck modifier bits
 }
 
 
@@ -156,6 +216,14 @@ void hidBleSendString(const String& str) {
     if (!bleActive || !bleKb || !bleKb->isConnected()) return;
     for (size_t i = 0; i < str.length(); i++) {
         bleKb->write((uint8_t)str.charAt(i));
+        bleKb->releaseAll();
         delay(10);
+    }
+}
+
+
+void hidBleClearReport() {
+    if (bleActive && bleKb && bleKb->isConnected()) {
+        bleKb->releaseAll();
     }
 }

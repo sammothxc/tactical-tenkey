@@ -35,4 +35,9 @@ void hidBleSendNumpadKey(char key, bool numLockOn);
 // Type a string as ASCII.
 void hidBleSendString(const String& str);
 
+// Send an all-zeros HID report. Used to clear any stuck modifier/key bits
+// after connection or pairing — some hosts (macOS notably) latch a phantom
+// modifier from the initial post-connect report otherwise.
+void hidBleClearReport();
+
 #endif

@@ -71,8 +71,9 @@ static const char* GUIDE_NUMPAD[] = {
     "[.] Delete",
     "[/] Tab",
     "[*] Backspace",
-    "[+ - = Enter] work",
-    "in both modes.",
+    "[=] Enter (both)",
+    "[+/-] Zoom in/out",
+    "(nav mode only)",
 };
 static const char* GUIDE_SEND[] = {
     "SEND ANSWER",
@@ -170,6 +171,7 @@ uint8_t menuPage = MENU_PAGE_MACROS;
 uint32_t sleepTimeoutMs = DEFAULT_SLEEP_TIMEOUT;
 uint8_t oledContrast = 255;
 uint8_t ledBrightness = 255;
+uint8_t zoomModifier = 0;  // 0 = Ctrl (Windows/Linux), 1 = Cmd/GUI (macOS)
 
 // settings page sub-views
 enum SettingsView {
@@ -183,7 +185,8 @@ enum SettingsView {
     SETTINGS_VIEW_RESET_CONFIRM,
     SETTINGS_VIEW_BT,
     SETTINGS_VIEW_BT_BONDS,
-    SETTINGS_VIEW_BT_FORGET
+    SETTINGS_VIEW_BT_FORGET,
+    SETTINGS_VIEW_ZOOM_PICK
 };
 SettingsView settingsView = SETTINGS_VIEW_LIST;
 uint8_t settingsIndex = 0;
@@ -198,7 +201,7 @@ enum BleMode {
 };
 BleMode bleMode = BLE_MODE_OFF;
 uint32_t bleModeUntil = 0;
-const uint32_t BLE_PAIRING_WINDOW_MS = 60000;
+const uint32_t BLE_PAIRING_WINDOW_MS = 180000;
 const uint32_t BLE_ADVERTISE_WINDOW_MS = 180000;
 uint8_t btMenuIdx = 0;
 const char* BT_ITEM_NAMES[] = {
@@ -229,6 +232,7 @@ const char* SETTINGS_NAMES[] = {
     "Brightness",
     "Quick Bind",
     "Bluetooth",
+    "Zoom Modifier",
     "Show Guide",
     "FW Info",
     "Factory Reset"
@@ -530,13 +534,16 @@ void handleKey(char key) {
                     case 4: // Bluetooth
                         settingsView = SETTINGS_VIEW_BT;
                         break;
-                    case 5: // Show Guide
+                    case 5: // Zoom Modifier
+                        settingsView = SETTINGS_VIEW_ZOOM_PICK;
+                        break;
+                    case 6: // Show Guide
                         showGuide();
                         break;
-                    case 6: // FW Info
+                    case 7: // FW Info
                         settingsView = SETTINGS_VIEW_FW_INFO;
                         break;
-                    case 7: // Factory Reset
+                    case 8: // Factory Reset
                         settingsView = SETTINGS_VIEW_RESET_CONFIRM;
                         break;
                 }
@@ -854,6 +861,25 @@ static void drawResetConfirm() {
     u8g2.drawStr(0, 64, "[5]Confirm [NUM]Cancel");
 }
 
+static void drawZoomPick() {
+    const char* options[2] = { "Ctrl (Win/Linux)", "Cmd (macOS)" };
+    u8g2.setFont(u8g2_font_6x10_tr);
+    for (int i = 0; i < 2; i++) {
+        int y = 28 + (i * 14);
+        if (i == zoomModifier) {
+            u8g2.drawBox(0, y - 10, 128, 14);
+            u8g2.setDrawColor(0);
+            u8g2.drawStr(4, y, options[i]);
+            u8g2.setDrawColor(1);
+        } else {
+            u8g2.drawStr(4, y, options[i]);
+        }
+    }
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 64, "[8/2]Nav [5]Save [NUM]Bk");
+}
+
+
 static void drawBTBondsList() {
     if (btBondCount == 0) {
         u8g2.setFont(u8g2_font_6x10_tr);
@@ -958,6 +984,8 @@ void drawSettingsPage() {
         u8g2.drawStr(0, 10, "PAIRED");
     } else if (settingsView == SETTINGS_VIEW_BT_FORGET) {
         u8g2.drawStr(0, 10, "FORGET?");
+    } else if (settingsView == SETTINGS_VIEW_ZOOM_PICK) {
+        u8g2.drawStr(0, 10, "ZOOM MOD");
     } else {
         u8g2.drawStr(0, 10, "SETTINGS");
     }
@@ -973,6 +1001,7 @@ void drawSettingsPage() {
         case SETTINGS_VIEW_BT:          drawBTSettings(); break;
         case SETTINGS_VIEW_BT_BONDS:    drawBTBondsList(); break;
         case SETTINGS_VIEW_BT_FORGET:   drawBTForgetConfirm(); break;
+        case SETTINGS_VIEW_ZOOM_PICK:   drawZoomPick(); break;
         default: break;
     }
 }
@@ -984,6 +1013,7 @@ void saveSettings() {
     p.putULong("sleepMs", sleepTimeoutMs);
     p.putUChar("contrast", oledContrast);
     p.putUChar("ledBri", ledBrightness);
+    p.putUChar("zoomMod", zoomModifier);
     p.putBytes("qbind", qbindSlots, sizeof(qbindSlots));
     p.end();
 }
@@ -998,6 +1028,7 @@ void factoryReset() {
     sleepTimeoutMs = DEFAULT_SLEEP_TIMEOUT;
     oledContrast = 255;
     ledBrightness = 255;
+    zoomModifier = 0;
     for (int i = 0; i < 10; i++) qbindSlots[i] = -1;
 
     bleShutdown();
@@ -1052,6 +1083,9 @@ void blePoll() {
             bleMode = BLE_MODE_CONNECTED;
             bleConnected = true;
             bleModeUntil = 0;
+            // clear any stuck modifier bits from the initial post-pair report
+            // (macOS will latch a phantom Ctrl otherwise → trackpad → right-click)
+            hidBleClearReport();
             updateDisplay();
         }
         return;
@@ -1272,6 +1306,26 @@ void handleSettingsKey(char key) {
             hidBleDeleteBond(btBondIdx);
             btRefreshBondsCache();
             settingsView = SETTINGS_VIEW_BT_BONDS;
+            drawMenu();
+            return;
+        }
+        return;
+    }
+
+    if (settingsView == SETTINGS_VIEW_ZOOM_PICK) {
+        if (key == '8') {
+            if (zoomModifier > 0) zoomModifier--;
+            drawMenu();
+            return;
+        }
+        if (key == '2') {
+            if (zoomModifier < 1) zoomModifier++;
+            drawMenu();
+            return;
+        }
+        if (key == '5' || key == '=') {
+            saveSettings();
+            settingsView = SETTINGS_VIEW_LIST;
             drawMenu();
             return;
         }
@@ -1611,6 +1665,7 @@ void setup() {
     sleepTimeoutMs = prefs.getULong("sleepMs", DEFAULT_SLEEP_TIMEOUT);
     oledContrast   = prefs.getUChar("contrast", 255);
     ledBrightness  = prefs.getUChar("ledBri",   255);
+    zoomModifier   = prefs.getUChar("zoomMod",  0);
     if (prefs.isKey("qbind")) {
         prefs.getBytes("qbind", qbindSlots, sizeof(qbindSlots));
     }
