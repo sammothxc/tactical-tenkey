@@ -8,13 +8,37 @@ extern uint8_t zoomModifier;  // defined in main.cpp: 0 = Ctrl, 1 = Cmd/GUI
 
 static const char* BLE_DEVICE_NAME = "Tactical Tenkey";
 
-static BleKeyboard* bleKb = nullptr;
+// Subclass to capture the connecting peer's MAC. T-vK BleKeyboard's connect
+// callback only takes BLEServer*; the param overload (with remote_bda) is
+// virtual on BLEServerCallbacks but unused upstream — we hook it here.
+class PeerAwareBleKeyboard : public BleKeyboard {
+public:
+    using BleKeyboard::BleKeyboard;
+    static uint8_t s_peerMac[6];
+    static bool s_peerKnown;
+
+    void onConnect(BLEServer* pServer, esp_ble_gatts_cb_param_t* param) override {
+        if (param) {
+            memcpy(s_peerMac, param->connect.remote_bda, 6);
+            s_peerKnown = true;
+        }
+    }
+
+    void onDisconnect(BLEServer* pServer) override {
+        s_peerKnown = false;
+        BleKeyboard::onDisconnect(pServer);
+    }
+};
+uint8_t PeerAwareBleKeyboard::s_peerMac[6] = {0};
+bool PeerAwareBleKeyboard::s_peerKnown = false;
+
+static PeerAwareBleKeyboard* bleKb = nullptr;
 static bool bleActive = false;
 
 
 static void ensureKb() {
     if (bleKb == nullptr) {
-        bleKb = new BleKeyboard(BLE_DEVICE_NAME, "Tactical Tenkey", 100);
+        bleKb = new PeerAwareBleKeyboard(BLE_DEVICE_NAME, "Tactical Tenkey", 100);
     }
 }
 
@@ -226,4 +250,11 @@ void hidBleClearReport() {
     if (bleActive && bleKb && bleKb->isConnected()) {
         bleKb->releaseAll();
     }
+}
+
+
+const uint8_t* hidBleGetPeerMac() {
+    if (!bleActive || !bleKb || !bleKb->isConnected()) return nullptr;
+    if (!PeerAwareBleKeyboard::s_peerKnown) return nullptr;
+    return PeerAwareBleKeyboard::s_peerMac;
 }

@@ -185,6 +185,8 @@ enum SettingsView {
     SETTINGS_VIEW_RESET_CONFIRM,
     SETTINGS_VIEW_BT,
     SETTINGS_VIEW_BT_BONDS,
+    SETTINGS_VIEW_BT_BOND,
+    SETTINGS_VIEW_BT_BOND_OS,
     SETTINGS_VIEW_BT_FORGET,
     SETTINGS_VIEW_ZOOM_PICK
 };
@@ -217,6 +219,15 @@ const uint8_t BT_ITEM_COUNT = sizeof(BT_ITEM_NAMES) / sizeof(BT_ITEM_NAMES[0]);
 String btBondAddrs[BT_BOND_MAX];
 uint8_t btBondCount = 0;
 uint8_t btBondIdx = 0;
+
+// per-bond metadata: maps a peer MAC to its OS (0 = Linux/Win → Ctrl, 1 = macOS → Cmd)
+struct BondMeta {
+    uint8_t mac[6];
+    uint8_t os;
+};
+BondMeta bondMetaList[BT_BOND_MAX];
+uint8_t bondMetaCount = 0;
+uint8_t btBondActionIdx = 0;  // selection within BT_BOND view (0 = Set OS, 1 = Forget)
 
 // macro quick bind: slot index holds a macro index, -1 = unbound
 // (slot 5 unused: -+5 is the FN chord)
@@ -265,6 +276,12 @@ void bleStartPairing();
 void bleShutdown();
 void blePoll();
 String bleStatusLine();
+static bool parseMacString(const String& s, uint8_t* out);
+static int findBondMetaByMac(const uint8_t* mac);
+static uint8_t getBondOSByMac(const uint8_t* mac);
+static void setBondOSByMac(const uint8_t* mac, uint8_t os);
+static void removeBondMetaByMac(const uint8_t* mac);
+static void applyConnectedPeerOS();
 void drawTopBar();
 void drawBottomBar();
 void drawMainDisplay();
@@ -916,6 +933,67 @@ static void drawBTBondsList() {
 }
 
 
+static void drawBTBondActions() {
+    // header is set in drawSettingsPage; render MAC + 2 actions
+    if (btBondIdx < btBondCount) {
+        u8g2.setFont(u8g2_font_5x7_tr);
+        u8g2.drawStr(0, 22, btBondAddrs[btBondIdx].c_str());
+    }
+
+    // current OS for this bond
+    uint8_t mac[6];
+    uint8_t curOS = 0;
+    if (btBondIdx < btBondCount && parseMacString(btBondAddrs[btBondIdx], mac)) {
+        curOS = getBondOSByMac(mac);
+    }
+    char osLine[24];
+    snprintf(osLine, sizeof(osLine), "OS: %s", curOS == 1 ? "macOS" : "Linux/Win");
+
+    const char* items[2];
+    items[0] = osLine;
+    items[1] = "Forget";
+
+    u8g2.setFont(u8g2_font_6x10_tr);
+    for (int i = 0; i < 2; i++) {
+        int y = 36 + (i * 14);
+        if (i == btBondActionIdx) {
+            u8g2.drawBox(0, y - 10, 128, 14);
+            u8g2.setDrawColor(0);
+            u8g2.drawStr(4, y, items[i]);
+            u8g2.setDrawColor(1);
+        } else {
+            u8g2.drawStr(4, y, items[i]);
+        }
+    }
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 64, "[8/2]Nav [5]Sel [NUM]Bk");
+}
+
+
+static void drawBTBondOSPick() {
+    uint8_t mac[6];
+    uint8_t curOS = 0;
+    if (btBondIdx < btBondCount && parseMacString(btBondAddrs[btBondIdx], mac)) {
+        curOS = getBondOSByMac(mac);
+    }
+    const char* options[2] = { "Linux/Win", "macOS" };
+    u8g2.setFont(u8g2_font_6x10_tr);
+    for (int i = 0; i < 2; i++) {
+        int y = 28 + (i * 14);
+        if (i == curOS) {
+            u8g2.drawBox(0, y - 10, 128, 14);
+            u8g2.setDrawColor(0);
+            u8g2.drawStr(4, y, options[i]);
+            u8g2.setDrawColor(1);
+        } else {
+            u8g2.drawStr(4, y, options[i]);
+        }
+    }
+    u8g2.setFont(u8g2_font_5x7_tr);
+    u8g2.drawStr(0, 64, "[8/2]Toggle [5]Save [NUM]Bk");
+}
+
+
 static void drawBTForgetConfirm() {
     u8g2.setFont(u8g2_font_5x7_tr);
     u8g2.drawStr(0, 24, "Forget bond:");
@@ -982,6 +1060,10 @@ void drawSettingsPage() {
         u8g2.drawStr(0, 10, s.c_str());
     } else if (settingsView == SETTINGS_VIEW_BT_BONDS) {
         u8g2.drawStr(0, 10, "PAIRED");
+    } else if (settingsView == SETTINGS_VIEW_BT_BOND) {
+        u8g2.drawStr(0, 10, "BOND");
+    } else if (settingsView == SETTINGS_VIEW_BT_BOND_OS) {
+        u8g2.drawStr(0, 10, "BOND OS");
     } else if (settingsView == SETTINGS_VIEW_BT_FORGET) {
         u8g2.drawStr(0, 10, "FORGET?");
     } else if (settingsView == SETTINGS_VIEW_ZOOM_PICK) {
@@ -1000,6 +1082,8 @@ void drawSettingsPage() {
         case SETTINGS_VIEW_RESET_CONFIRM: drawResetConfirm(); break;
         case SETTINGS_VIEW_BT:          drawBTSettings(); break;
         case SETTINGS_VIEW_BT_BONDS:    drawBTBondsList(); break;
+        case SETTINGS_VIEW_BT_BOND:     drawBTBondActions(); break;
+        case SETTINGS_VIEW_BT_BOND_OS:  drawBTBondOSPick(); break;
         case SETTINGS_VIEW_BT_FORGET:   drawBTForgetConfirm(); break;
         case SETTINGS_VIEW_ZOOM_PICK:   drawZoomPick(); break;
         default: break;
@@ -1015,6 +1099,8 @@ void saveSettings() {
     p.putUChar("ledBri", ledBrightness);
     p.putUChar("zoomMod", zoomModifier);
     p.putBytes("qbind", qbindSlots, sizeof(qbindSlots));
+    p.putUChar("bmCnt", bondMetaCount);
+    p.putBytes("bmData", bondMetaList, bondMetaCount * sizeof(BondMeta));
     p.end();
 }
 
@@ -1029,6 +1115,7 @@ void factoryReset() {
     oledContrast = 255;
     ledBrightness = 255;
     zoomModifier = 0;
+    bondMetaCount = 0;
     for (int i = 0; i < 10; i++) qbindSlots[i] = -1;
 
     bleShutdown();
@@ -1036,6 +1123,58 @@ void factoryReset() {
 
     u8g2.setContrast(oledContrast);
     analogWrite(LED_PIN, ledBrightness);
+}
+
+
+// --- bond metadata helpers ---
+
+static bool parseMacString(const String& s, uint8_t* out) {
+    if (s.length() < 17) return false;
+    for (int i = 0; i < 6; i++) {
+        char hex[3] = { s.charAt(i * 3), s.charAt(i * 3 + 1), 0 };
+        out[i] = (uint8_t)strtol(hex, nullptr, 16);
+    }
+    return true;
+}
+
+static int findBondMetaByMac(const uint8_t* mac) {
+    for (uint8_t i = 0; i < bondMetaCount; i++) {
+        if (memcmp(bondMetaList[i].mac, mac, 6) == 0) return i;
+    }
+    return -1;
+}
+
+static uint8_t getBondOSByMac(const uint8_t* mac) {
+    int idx = findBondMetaByMac(mac);
+    return (idx < 0) ? 0 : bondMetaList[idx].os;
+}
+
+static void setBondOSByMac(const uint8_t* mac, uint8_t os) {
+    int idx = findBondMetaByMac(mac);
+    if (idx >= 0) {
+        bondMetaList[idx].os = os;
+    } else if (bondMetaCount < BT_BOND_MAX) {
+        memcpy(bondMetaList[bondMetaCount].mac, mac, 6);
+        bondMetaList[bondMetaCount].os = os;
+        bondMetaCount++;
+    }
+    saveSettings();
+}
+
+static void removeBondMetaByMac(const uint8_t* mac) {
+    int idx = findBondMetaByMac(mac);
+    if (idx < 0) return;
+    for (uint8_t i = idx; i < bondMetaCount - 1; i++) {
+        bondMetaList[i] = bondMetaList[i + 1];
+    }
+    bondMetaCount--;
+    saveSettings();
+}
+
+static void applyConnectedPeerOS() {
+    const uint8_t* peer = hidBleGetPeerMac();
+    if (!peer) return;
+    zoomModifier = getBondOSByMac(peer);
 }
 
 
@@ -1086,6 +1225,8 @@ void blePoll() {
             // clear any stuck modifier bits from the initial post-pair report
             // (macOS will latch a phantom Ctrl otherwise → trackpad → right-click)
             hidBleClearReport();
+            // auto-apply zoom modifier based on which bonded peer connected
+            applyConnectedPeerOS();
             updateDisplay();
         }
         return;
@@ -1135,7 +1276,9 @@ String bleStatusLine() {
 
 void handleSettingsKey(char key) {
     if (key == 'C') {
-        if (settingsView == SETTINGS_VIEW_BT_FORGET) {
+        if (settingsView == SETTINGS_VIEW_BT_FORGET || settingsView == SETTINGS_VIEW_BT_BOND_OS) {
+            settingsView = SETTINGS_VIEW_BT_BOND;
+        } else if (settingsView == SETTINGS_VIEW_BT_BOND) {
             settingsView = SETTINGS_VIEW_BT_BONDS;
         } else if (settingsView == SETTINGS_VIEW_BT_BONDS) {
             settingsView = SETTINGS_VIEW_BT;
@@ -1291,7 +1434,60 @@ void handleSettingsKey(char key) {
             return;
         }
         if (key == '5' || key == '=') {
-            settingsView = SETTINGS_VIEW_BT_FORGET;
+            btBondActionIdx = 0;
+            settingsView = SETTINGS_VIEW_BT_BOND;
+            drawMenu();
+            return;
+        }
+        return;
+    }
+
+    if (settingsView == SETTINGS_VIEW_BT_BOND) {
+        if (key == '8') {
+            if (btBondActionIdx > 0) btBondActionIdx--;
+            drawMenu();
+            return;
+        }
+        if (key == '2') {
+            if (btBondActionIdx < 1) btBondActionIdx++;
+            drawMenu();
+            return;
+        }
+        if (key == '5' || key == '=') {
+            if (btBondActionIdx == 0) {
+                settingsView = SETTINGS_VIEW_BT_BOND_OS;
+            } else {
+                settingsView = SETTINGS_VIEW_BT_FORGET;
+            }
+            drawMenu();
+            return;
+        }
+        return;
+    }
+
+    if (settingsView == SETTINGS_VIEW_BT_BOND_OS) {
+        if (btBondIdx >= btBondCount) {
+            settingsView = SETTINGS_VIEW_BT_BOND;
+            drawMenu();
+            return;
+        }
+        uint8_t mac[6];
+        if (!parseMacString(btBondAddrs[btBondIdx], mac)) {
+            settingsView = SETTINGS_VIEW_BT_BOND;
+            drawMenu();
+            return;
+        }
+        if (key == '8' || key == '2') {
+            // toggle current OS
+            uint8_t cur = getBondOSByMac(mac);
+            setBondOSByMac(mac, cur == 0 ? 1 : 0);
+            drawMenu();
+            return;
+        }
+        if (key == '5' || key == '=') {
+            // if this is the currently connected peer, apply immediately
+            applyConnectedPeerOS();
+            settingsView = SETTINGS_VIEW_BT_BOND;
             drawMenu();
             return;
         }
@@ -1303,7 +1499,10 @@ void handleSettingsKey(char key) {
             // if forgetting the currently-connected peer, drop the connection first
             bool wasConnected = (bleMode == BLE_MODE_CONNECTED);
             if (wasConnected) bleShutdown();
+            uint8_t mac[6];
+            bool macOk = parseMacString(btBondAddrs[btBondIdx], mac);
             hidBleDeleteBond(btBondIdx);
+            if (macOk) removeBondMetaByMac(mac);
             btRefreshBondsCache();
             settingsView = SETTINGS_VIEW_BT_BONDS;
             drawMenu();
@@ -1668,6 +1867,11 @@ void setup() {
     zoomModifier   = prefs.getUChar("zoomMod",  0);
     if (prefs.isKey("qbind")) {
         prefs.getBytes("qbind", qbindSlots, sizeof(qbindSlots));
+    }
+    bondMetaCount = prefs.getUChar("bmCnt", 0);
+    if (bondMetaCount > BT_BOND_MAX) bondMetaCount = 0;
+    if (bondMetaCount > 0 && prefs.isKey("bmData")) {
+        prefs.getBytes("bmData", bondMetaList, bondMetaCount * sizeof(BondMeta));
     }
     u8g2.setContrast(oledContrast);
     analogWrite(LED_PIN, ledBrightness);

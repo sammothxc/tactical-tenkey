@@ -40,4 +40,9 @@ void hidBleSendString(const String& str);
 // modifier from the initial post-connect report otherwise.
 void hidBleClearReport();
 
+// Returns the 6-byte MAC of the currently connected peer, or nullptr if no
+// connection is up or the address hasn't been captured yet. The pointer is
+// only valid while the connection lasts.
+const uint8_t* hidBleGetPeerMac();
+
 #endif
