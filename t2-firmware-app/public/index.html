@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>T² — Tactical TenKey Firmware</title>
+  <script
+    type="module"
+    src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"
+  ></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --surface-raised: #1a1a1a;
+      --border: #2a2a2a;
+      --border-accent: #3a3a3a;
+      --text: #e0e0e0;
+      --text-dim: #888888;
+      --text-muted: #555555;
+      --accent: #00ff88;
+      --accent-dim: #00cc6a;
+      --accent-glow: rgba(0, 255, 136, 0.15);
+      --danger: #ff4444;
+      --pixel: 4px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'IBM Plex Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      overflow-x: hidden;
+    }
+
+    /* Scanline overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.08) 2px,
+        rgba(0, 0, 0, 0.08) 4px
+      );
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    /* Grid background */
+    .grid-bg {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.15;
+      pointer-events: none;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 560px;
+      padding: 2rem 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ---- HEADER / LOGO ---- */
+    .header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      animation: fadeDown 0.6s ease-out;
+    }
+
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .logo-mark {
+      display: inline-block;
+      margin-bottom: 0.75rem;
+    }
+
+    .logo-mark svg {
+      width: 80px;
+      height: 80px;
+    }
+
+    .logo-title {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 2rem;
+      letter-spacing: 0.15em;
+      color: var(--accent);
+      text-shadow: 0 0 20px var(--accent-glow);
+      margin-bottom: 0.25rem;
+    }
+
+    .logo-subtitle {
+      font-size: 0.7rem;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    /* ---- CARDS ---- */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      position: relative;
+      animation: fadeUp 0.5s ease-out both;
+    }
+
+    .card:nth-child(2) { animation-delay: 0.1s; }
+    .card:nth-child(3) { animation-delay: 0.2s; }
+    .card:nth-child(4) { animation-delay: 0.3s; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Pixel corner accents */
+    .card::before,
+    .card::after {
+      content: '';
+      position: absolute;
+      width: var(--pixel);
+      height: var(--pixel);
+      background: var(--accent);
+    }
+    .card::before { top: -1px; left: -1px; }
+    .card::after { bottom: -1px; right: -1px; }
+
+    .card-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* ---- FIRMWARE INFO ---- */
+    .firmware-info {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .info-block label {
+      display: block;
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 0.25rem;
+    }
+
+    .info-block .value {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 1.1rem;
+      color: var(--accent);
+    }
+
+    .info-block .value.date-val {
+      color: var(--text-dim);
+      font-size: 0.95rem;
+    }
+
+    /* ---- CHANGELOG ---- */
+    .changelog {
+      font-size: 0.85rem;
+      line-height: 1.7;
+      color: var(--text-dim);
+      white-space: pre-line;
+    }
+
+    /* ---- FLASH SECTION ---- */
+    .flash-section {
+      text-align: center;
+    }
+
+    .flash-instructions {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 1.25rem;
+    }
+
+    .flash-instructions strong {
+      color: var(--text-dim);
+    }
+
+    /* ESP Web Tools button styling */
+    esp-web-install-button {
+      display: inline-block;
+    }
+
+    esp-web-install-button button {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.9rem;
+      letter-spacing: 0.1em;
+      padding: 0.85rem 2.5rem;
+      background: transparent;
+      color: var(--accent);
+      border: 2px solid var(--accent);
+      cursor: pointer;
+      text-transform: uppercase;
+      position: relative;
+      transition: all 0.2s ease;
+    }
+
+    esp-web-install-button button:hover {
+      background: var(--accent);
+      color: var(--bg);
+      box-shadow: 0 0 24px var(--accent-glow);
+    }
+
+    esp-web-install-button button::before,
+    esp-web-install-button button::after {
+      content: '';
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      transition: background 0.2s ease;
+    }
+    esp-web-install-button button::before { top: -3px; left: -3px; }
+    esp-web-install-button button::after { bottom: -3px; right: -3px; }
+
+    esp-web-install-button button:hover::before,
+    esp-web-install-button button:hover::after {
+      background: var(--bg);
+    }
+
+    .unsupported-msg {
+      display: none;
+      font-size: 0.8rem;
+      color: var(--danger);
+      margin-top: 1rem;
+      padding: 1rem;
+      border: 1px solid var(--danger);
+    }
+
+    /* ---- STATUS BAR ---- */
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 0.5rem;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .status-dot.offline {
+      background: var(--danger);
+      animation: none;
+    }
+
+    /* ---- FOOTER ---- */
+    .footer {
+      text-align: center;
+      margin-top: 2rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--border);
+      animation: fadeUp 0.5s ease-out 0.4s both;
+    }
+
+    .footer-text {
+      font-size: 0.6rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .footer-text a {
+      color: var(--text-dim);
+      text-decoration: none;
+    }
+
+    .footer-text a:hover {
+      color: var(--accent);
+    }
+
+    .edition-badge {
+      display: inline-block;
+      margin-top: 0.75rem;
+      font-size: 0.55rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: 0.3rem 0.8rem;
+    }
+
+    /* ---- LOADING STATE ---- */
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+    }
+
+    .loading-dots::after {
+      content: '';
+      animation: dots 1.5s steps(4, end) infinite;
+    }
+
+    @keyframes dots {
+      0% { content: ''; }
+      25% { content: '.'; }
+      50% { content: '..'; }
+      75% { content: '...'; }
+    }
+
+    .error-msg {
+      color: var(--danger);
+      font-size: 0.8rem;
+      text-align: center;
+      padding: 1rem;
+      border: 1px solid var(--danger);
+      background: rgba(255, 68, 68, 0.05);
+    }
+
+    /* ---- RESPONSIVE ---- */
+    @media (max-width: 480px) {
+      .container { padding: 1.5rem 1rem; }
+      .logo-title { font-size: 1.6rem; }
+      .firmware-info { grid-template-columns: 1fr; gap: 0.75rem; }
+      .card { padding: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="grid-bg"></div>
+
+  <div class="container">
+    <header class="header">
+      <div class="logo-mark">
+        <!-- Pixel-art T² icon -->
+        <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges">
+          <rect x="1" y="1" width="14" height="14" fill="none" stroke="#00ff88" stroke-width="1"/>
+          <!-- T -->
+          <rect x="3" y="3" width="5" height="1" fill="#00ff88"/>
+          <rect x="5" y="4" width="1" height="5" fill="#00ff88"/>
+          <!-- 2 -->
+          <rect x="9" y="3" width="3" height="1" fill="#00ff88"/>
+          <rect x="11" y="4" width="1" height="2" fill="#00ff88"/>
+          <rect x="9" y="6" width="3" height="1" fill="#00ff88"/>
+          <rect x="9" y="7" width="1" height="2" fill="#00ff88"/>
+          <rect x="9" y="9" width="3" height="1" fill="#00ff88"/>
+          <!-- Underline -->
+          <rect x="3" y="12" width="10" height="1" fill="#2a2a2a"/>
+        </svg>
+      </div>
+      <div class="logo-title">T²</div>
+      <div class="logo-subtitle">Tactical TenKey — Firmware Update</div>
+    </header>
+
+    <main id="app">
+      <div class="loading">
+        <span>Fetching firmware manifest<span class="loading-dots"></span></span>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="footer-text">
+        Built by <a href="https://github.com/sammothxc" target="_blank" rel="noopener">sammothxc</a>
+      </div>
+      <div class="edition-badge">FatherFigures Edition</div>
+    </footer>
+  </div>
+
+  <script>
+    const REPO = 'sammothxc/tactical-tenkey';
+    const BRANCH = 'main';
+    const FW_BASE = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/firmware`;
+    const MANIFEST_URL = `${FW_BASE}/firmware.json`;
+    const BIN_URL = `${FW_BASE}/t2.bin`;
+
+    async function init() {
+      const app = document.getElementById('app');
+
+      try {
+        const resp = await fetch(MANIFEST_URL, { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const manifest = await resp.json();
+
+        // Generate ESP Web Tools manifest as a blob URL so it can
+        // reference the firmware binary hosted on GitHub
+        const espManifest = {
+          name: "Tactical TenKey (T²)",
+          version: manifest.version,
+          builds: [{
+            chipFamily: "ESP32-S3",
+            parts: [{ path: BIN_URL, offset: 0 }]
+          }]
+        };
+        const blob = new Blob([JSON.stringify(espManifest)], { type: 'application/json' });
+        const manifestBlobUrl = URL.createObjectURL(blob);
+
+        render(app, manifest, manifestBlobUrl);
+      } catch (err) {
+        app.innerHTML = `
+          <div class="card">
+            <div class="error-msg">
+              Could not load firmware manifest.<br>
+              <span style="font-size:0.7rem; color:var(--text-muted);">${err.message}</span>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function render(container, fw, manifestUrl) {
+      const dateStr = fw.date
+        ? new Date(fw.date + 'T00:00:00').toLocaleDateString('en-US', {
+            year: 'numeric', month: 'short', day: 'numeric'
+          })
+        : '—';
+
+      container.innerHTML = `
+        <!-- Firmware Info -->
+        <div class="card">
+          <div class="card-label">Latest Firmware</div>
+          <div class="firmware-info">
+            <div class="info-block">
+              <label>Version</label>
+              <div class="value">v${fw.version}</div>
+            </div>
+            <div class="info-block">
+              <label>Released</label>
+              <div class="value date-val">${dateStr}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Changelog -->
+        ${fw.notes ? `
+        <div class="card">
+          <div class="card-label">Changelog</div>
+          <div class="changelog">${escapeHtml(fw.notes)}</div>
+        </div>
+        ` : ''}
+
+        <!-- Flash -->
+        <div class="card">
+          <div class="card-label">Install</div>
+          <div class="flash-section">
+            <div class="flash-instructions">
+              Connect the <strong>T²</strong> via USB-C, then click flash.<br>
+              Use a Chromium-based browser (Chrome, Edge, Brave).
+            </div>
+
+            <esp-web-install-button id="flash-btn" manifest="${manifestUrl}">
+              <button slot="activate">Flash Firmware</button>
+              <span slot="unsupported">
+                <div class="unsupported-msg" style="display:block;">
+                  Your browser doesn't support Web Serial.<br>
+                  Please use Chrome, Edge, or Brave on desktop.
+                </div>
+              </span>
+              <span slot="not-allowed">
+                <div class="unsupported-msg" style="display:block;">
+                  Serial access was denied.<br>
+                  Check your browser permissions.
+                </div>
+              </span>
+            </esp-web-install-button>
+
+            <div class="status-bar" id="status-bar">
+              <div class="status-dot" id="status-dot"></div>
+              <span id="status-text">Ready</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    init();
+  </script>
+</body>
+</html>

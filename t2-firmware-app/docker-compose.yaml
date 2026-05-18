@@ -1,0 +1,7 @@
+services:
+  t2-firmware-app:
+    container_name: t2-firmware-app
+    image: ghcr.io/sammothxc/t2-firmware-app
+    restart: unless-stopped
+    ports:
+      - 8080:80
