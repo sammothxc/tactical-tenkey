@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 't2-firmware-app/**'
+  workflow_dispatch:
 
 jobs:
   build:
