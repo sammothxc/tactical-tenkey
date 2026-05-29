@@ -3,11 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>T² — Tactical TenKey Firmware</title>
-  <script
-    type="module"
-    src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"
-  ></script>
+  <title>Tactical Tenkey Firmware App</title>
+  <scripttype="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -325,17 +322,6 @@
       color: var(--accent);
     }
 
-    .edition-badge {
-      display: inline-block;
-      margin-top: 0.75rem;
-      font-size: 0.55rem;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: var(--text-muted);
-      border: 1px solid var(--border);
-      padding: 0.3rem 0.8rem;
-    }
-
     /* ---- LOADING STATE ---- */
     .loading {
       text-align: center;
@@ -397,7 +383,7 @@
         </svg>
       </div>
       <div class="logo-title">T²</div>
-      <div class="logo-subtitle">Tactical TenKey — Firmware Update</div>
+      <div class="logo-subtitle">Tactical Tenkey Firmware App</div>
     </header>
 
     <main id="app">
@@ -410,33 +396,40 @@
       <div class="footer-text">
         Built by <a href="https://github.com/sammothxc" target="_blank" rel="noopener">sammothxc</a>
       </div>
-      <div class="edition-badge">FatherFigures Edition</div>
     </footer>
   </div>
 
   <script>
     const REPO = 'sammothxc/tactical-tenkey';
-    const BRANCH = 'main';
-    const FW_BASE = `https://raw.githubusercontent.com/${REPO}/${BRANCH}/firmware`;
-    const MANIFEST_URL = `${FW_BASE}/firmware.json`;
-    const BIN_URL = `${FW_BASE}/t2.bin`;
+    const RELEASES_API = `https://api.github.com/repos/${REPO}/releases/latest`;
 
     async function init() {
       const app = document.getElementById('app');
 
       try {
-        const resp = await fetch(MANIFEST_URL, { cache: 'no-store' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const manifest = await resp.json();
+        const resp = await fetch(RELEASES_API, {
+          cache: 'no-store',
+          headers: { Accept: 'application/vnd.github+json' }
+        });
+        if (!resp.ok) throw new Error(`GitHub API HTTP ${resp.status}`);
+        const release = await resp.json();
 
-        // Generate ESP Web Tools manifest as a blob URL so it can
-        // reference the firmware binary hosted on GitHub
+        const version = release.tag_name.replace(/^v/, '');
+        const date = release.published_at ? release.published_at.slice(0, 10) : null;
+        const notes = release.body || '';
+
+        const asset = release.assets.find(a => a.name === 'firmware.bin');
+        if (!asset) throw new Error('firmware.bin not found in latest release');
+        const binUrl = asset.browser_download_url;
+
+        const manifest = { version, date, notes };
+
         const espManifest = {
           name: "Tactical TenKey (T²)",
-          version: manifest.version,
+          version,
           builds: [{
             chipFamily: "ESP32-S3",
-            parts: [{ path: BIN_URL, offset: 0 }]
+            parts: [{ path: binUrl, offset: 0 }]
           }]
         };
         const blob = new Blob([JSON.stringify(espManifest)], { type: 'application/json' });
