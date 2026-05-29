@@ -416,7 +416,7 @@
           version,
           builds: [{
             chipFamily: "ESP32-S3",
-            parts: [{ path: binUrl, offset: 0 }]
+            parts: [{ path: `${window.location.origin}/firmware`, offset: 0 }]
           }]
         };
         const blob = new Blob([JSON.stringify(espManifest)], { type: 'application/json' });
