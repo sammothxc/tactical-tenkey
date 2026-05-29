@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include "version.h"
 
-// changelog for this version (shown on major/minor bump)
+// changelog for this version, shown on major/minor bump
 const char* CHANGELOG[] = {
     "v0.1.0 - First Release",
     "",
@@ -13,7 +13,7 @@ const char* CHANGELOG[] = {
 };
 const uint8_t CHANGELOG_LINES = 7;
 
-// guide pages (shown on first boot)
+// guide pages, shown on first boot
 struct GuidePage {
     const char* const* lines;
     uint8_t lineCount;
