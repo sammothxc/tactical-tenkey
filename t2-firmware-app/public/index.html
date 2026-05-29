@@ -416,7 +416,9 @@
 
         const version = release.tag_name.replace(/^v/, '');
         const date = release.published_at ? release.published_at.slice(0, 10) : null;
-        const notes = release.body || '';
+        const notes = (release.body || '')
+          .replace(/\*\*Full Changelog\*\*:.*$/m, '')
+          .trim();
 
         const asset = release.assets.find(a => a.name === 'firmware.bin');
         if (!asset) throw new Error('firmware.bin not found in latest release');
@@ -484,7 +486,7 @@
           <div class="card-label">Install</div>
           <div class="flash-section">
             <div class="flash-instructions">
-              Connect the <strong>T²</strong> via USB-C, then click flash.<br>
+              Connect your Tactical Tenkey via USB-C, then click flash.<br>
               Use a Chromium-based browser (Chrome, Edge, Brave).
             </div>
 
