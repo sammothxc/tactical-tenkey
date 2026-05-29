@@ -67,10 +67,14 @@ jobs:
           name: firmware-${{ steps.ver.outputs.override }}
           path: .pio/build/seeed_xiao_esp32s3/firmware.bin
 
+      - name: Get commit message
+        id: commit
+        run: echo "msg=$(git log -1 --pretty=%s)" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: v${{ steps.ver.outputs.override }}
           tag_name: v${{ steps.ver.outputs.override }}
-          generate_release_notes: true
+          body: ${{ steps.commit.outputs.msg }}
           files: .pio/build/seeed_xiao_esp32s3/firmware.bin

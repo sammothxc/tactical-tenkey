@@ -416,9 +416,7 @@
 
         const version = release.tag_name.replace(/^v/, '');
         const date = release.published_at ? release.published_at.slice(0, 10) : null;
-        const notes = (release.body || '')
-          .replace(/\*\*Full Changelog\*\*:.*$/m, '')
-          .trim();
+        const notes = release.body || '';
 
         const asset = release.assets.find(a => a.name === 'firmware.bin');
         if (!asset) throw new Error('firmware.bin not found in latest release');
