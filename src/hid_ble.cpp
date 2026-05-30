@@ -86,16 +86,21 @@ void hidBleInit(bool pairingMode) {
     if (adv) {
         adv->stop();
 
+        // Carry everything a host needs to recognize a BLE keyboard in the
+        // PRIMARY advertisement: flags, appearance, the HID service UUID
+        // (0x1812), and the name. Windows discovers/categorizes HID peripherals
+        // from the primary packet and ignores the scan response for this — if
+        // the service UUID rides only in the scan response (as it did before),
+        // Windows won't list the device as a keyboard. macOS solicits the scan
+        // response and merges it, which is why it worked either way.
+        // Budget: flags(3) + appearance(4) + svc UUID(4) + name(17) = 28/31.
         BLEAdvertisementData advData;
         advData.setFlags(0x06);  // LE general discoverable + BR/EDR not supported
-        advData.setName(BLE_DEVICE_NAME);
         advData.setAppearance(0x03C1);  // HID Keyboard
+        advData.setCompleteServices(BLEUUID((uint16_t)0x1812));  // HID service
+        advData.setName(BLE_DEVICE_NAME);
         adv->setAdvertisementData(advData);
-
-        BLEAdvertisementData scanRsp;
-        scanRsp.setCompleteServices(BLEUUID((uint16_t)0x1812));  // HID service
-        adv->setScanResponseData(scanRsp);
-        adv->setScanResponse(true);
+        adv->setScanResponse(false);
 
         // Hint preferred connection params to the host (Slave Connection
         // Interval Range AD type). Encourages Linux to pick relaxed values
