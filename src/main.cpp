@@ -348,6 +348,7 @@ char scanMatrix() {
     static bool fiveFnUsed = false;
     bool minusReleased = prevMinus && !currentMinus;
     bool fiveReleased  = prevFive  && !currentFive;
+    bool fiveJustPressed = currentFive && !prevFive;
     prevMinus = currentMinus;
     prevFive  = currentFive;
 
@@ -438,10 +439,18 @@ char scanMatrix() {
         minusFnUsed = false;
         if (wasSolo) return '-';
     }
+    // five fires on press when minus is not held — no FN chord is possible
+    static bool fiveFiredOnPress = false;
+    if (fiveJustPressed && !currentMinus) {
+        fiveFiredOnPress = true;
+        return '5';
+    }
     if (fiveReleased) {
+        bool suppressRelease = fiveFiredOnPress;
+        fiveFiredOnPress = false;
         bool wasSolo = !fiveFnUsed;
         fiveFnUsed = false;
-        if (wasSolo) return '5';
+        if (wasSolo && !suppressRelease) return '5';
     }
 
     // other single keys fire on press (suppress / and * while - is held)
