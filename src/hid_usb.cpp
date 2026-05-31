@@ -25,6 +25,23 @@ static bool usbStarted = false;
 #define KEY_NUMPAD_0     0x62
 #define KEY_NUMPAD_DOT   0x63
 
+// main-row digits (page 0x07). Unlike the keypad digit usages (0x59-0x62),
+// these always produce digits regardless of the *host's* NumLock state, which
+// the device can neither see nor control. Using them keeps NUM mode reliable
+// even when the host has NumLock off (otherwise the host reads keypad digits
+// as navigation -> "NUM mode but no numbers, only nav").
+#define KEY_ROW_1        0x1E
+#define KEY_ROW_2        0x1F
+#define KEY_ROW_3        0x20
+#define KEY_ROW_4        0x21
+#define KEY_ROW_5        0x22
+#define KEY_ROW_6        0x23
+#define KEY_ROW_7        0x24
+#define KEY_ROW_8        0x25
+#define KEY_ROW_9        0x26
+#define KEY_ROW_0        0x27
+#define KEY_ROW_PERIOD   0x37
+
 // navigation cluster (when numlock is off)
 #define KEY_HID_INSERT   0x49
 #define KEY_HID_HOME     0x4A
@@ -55,18 +72,20 @@ void hidUsbSendNumpadKey(char key, bool numLockOn) {
     uint8_t keycode = 0;
 
     if (numLockOn) {
+        // digits + '.' use main-row usages so they're immune to host NumLock;
+        // operators and Enter use the keypad usages (already NumLock-independent)
         switch (key) {
-            case '0': keycode = KEY_NUMPAD_0; break;
-            case '1': keycode = KEY_NUMPAD_1; break;
-            case '2': keycode = KEY_NUMPAD_2; break;
-            case '3': keycode = KEY_NUMPAD_3; break;
-            case '4': keycode = KEY_NUMPAD_4; break;
-            case '5': keycode = KEY_NUMPAD_5; break;
-            case '6': keycode = KEY_NUMPAD_6; break;
-            case '7': keycode = KEY_NUMPAD_7; break;
-            case '8': keycode = KEY_NUMPAD_8; break;
-            case '9': keycode = KEY_NUMPAD_9; break;
-            case '.': keycode = KEY_NUMPAD_DOT; break;
+            case '0': keycode = KEY_ROW_0; break;
+            case '1': keycode = KEY_ROW_1; break;
+            case '2': keycode = KEY_ROW_2; break;
+            case '3': keycode = KEY_ROW_3; break;
+            case '4': keycode = KEY_ROW_4; break;
+            case '5': keycode = KEY_ROW_5; break;
+            case '6': keycode = KEY_ROW_6; break;
+            case '7': keycode = KEY_ROW_7; break;
+            case '8': keycode = KEY_ROW_8; break;
+            case '9': keycode = KEY_ROW_9; break;
+            case '.': keycode = KEY_ROW_PERIOD; break;
             case '+': keycode = KEY_NUMPAD_PLUS; break;
             case '-': keycode = KEY_NUMPAD_MINUS; break;
             case '*': keycode = KEY_NUMPAD_MULT; break;

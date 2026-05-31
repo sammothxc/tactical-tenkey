@@ -7,7 +7,7 @@ A tactile, tactical tenkey that doubles as a USB/BT numpad
 - [ ] fix battery level
 
 ### Windows
-- [ ] fix pg up and pg down
+- [ ] fix pgup and pgdown no working
 - [ ] fix numlock always on, so no numbers only nav
 - [ ] fix laggy input in nav mode (BT)
 - [ ] fix no input in num mode (BT)
@@ -15,7 +15,7 @@ A tactile, tactical tenkey that doubles as a USB/BT numpad
 - [ ] fix laggy 'send result' on windows (BT)
 
 ### MacOS
-- [ ] 
+- [ ] fix home/end/pgup/pgdown not working
 
 ### Linux
 - [ ] fix not pairing with Linux
