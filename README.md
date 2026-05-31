@@ -2,19 +2,10 @@
 A tactile, tactical tenkey that doubles as a USB/BT numpad
 
 ## TODO
-### General
 - [ ] fix menu timeout glitch
 - [ ] fix battery level
-
-### Windows
-- [ ] fix pgup and pgdown no working
-- [ ] fix laggy input in nav mode (BT)
-- [ ] fix no input in num mode (BT)
-- [ ] fix first 'send result' sending 23 extra of the first digit (BT)
-- [ ] fix laggy 'send result' on windows (BT)
-
-### MacOS
-- [ ] fix home/end/pgup/pgdown not working
-
-### Linux
+- [ ] fix laggy input in nav mode (win, BT)
+- [ ] fix no input in num mode (win, BT)
+- [ ] fix first 'send result' sending 23 extra of the first digit (win, BT)
+- [ ] fix laggy 'send result' (win, BT)
 - [ ] fix not pairing with Linux

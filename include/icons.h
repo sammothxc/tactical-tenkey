@@ -114,6 +114,7 @@ static const unsigned char ICON_LOWBATT[] = {
 };
 
 
+
 //     # # #              
 //   # # # # #   #       #
 //   # # # # #   # # # # #
@@ -165,6 +166,7 @@ static const unsigned char ICON_APPLE[] = {
     0xfe, 0x03,
     0x8c, 0x01
 };
+
 
 
 static unsigned char LOGO[] = {
