@@ -1,18 +1,6 @@
 #include <Arduino.h>
 #include "version.h"
 
-// changelog for this version, shown on major/minor bump
-const char* CHANGELOG[] = {
-    "v0.1.0 - First Release",
-    "",
-    "* Calculator + numpad mode",
-    "* 6 accounting macros",
-    "* FN key combinations",
-    "* USB HID support",
-    "* Auto sleep/wake",
-};
-const uint8_t CHANGELOG_LINES = 7;
-
 // guide pages, shown on first boot
 struct GuidePage {
     const char* const* lines;
@@ -133,6 +121,17 @@ enum GuideAction {
 #define WAKE_PIN 1 // Enter key
 #define DEFAULT_SLEEP_TIMEOUT 300000
 
+#define BATT_PIN 3 // ADC1_CH2 (XIAO pad D2). MUST be ADC1 (GPIO1-10): ADC2 fails while BLE is on.
+#define BATT_SAMPLE_INTERVAL 60000 // re-check battery every 60s while awake
+
+// Battery sense via a 2:1 divider (measured pin mV * BATT_DIVIDER = battery mV).
+// Only a low-battery warning is needed, so we just threshold with hysteresis.
+#define BATT_DIVIDER 2.0f
+#define BATT_LOW_MV       3500 // assert low-battery warning at/below this
+#define BATT_CLEAR_MV     3600 // clear it above this (hysteresis to stop flicker)
+#define BATT_VALID_MIN_MV 2800 // below this = USB-powered / no live cell -> no warning
+#define BATT_VALID_MAX_MV 4350 // above this = implausible -> ignore
+
 const uint8_t ROW_PINS[4] = {42, 2, 4, 43};
 const uint8_t COL_PINS[4] = {9, 8, 7, 44};
 
@@ -188,7 +187,8 @@ enum SettingsView {
     SETTINGS_VIEW_BT_BOND,
     SETTINGS_VIEW_BT_BOND_OS,
     SETTINGS_VIEW_BT_FORGET,
-    SETTINGS_VIEW_ZOOM_PICK
+    SETTINGS_VIEW_ZOOM_PICK,
+    SETTINGS_VIEW_BATTERY
 };
 SettingsView settingsView = SETTINGS_VIEW_LIST;
 uint8_t settingsIndex = 0;
@@ -238,14 +238,31 @@ uint8_t qbindListIdx = 0;     // selection within QBIND_LIST (0..8 -> QBIND_VALI
 uint8_t qbindEditSlot = 0;    // slot being edited in QBIND_PICK
 uint8_t qbindPickIdx = 0;     // selection in QBIND_PICK (0 = None, 1..MACRO_COUNT = macro)
 
+// Settings menu order. SETTINGS_NAMES below MUST stay in this exact order, and
+// the select switch in handleKey() must use these names (not raw indices), so
+// the list can be reordered without silently remapping actions.
+enum SettingsItem {
+    SET_HOST_OS = 0,
+    SET_BLUETOOTH,
+    SET_BRIGHTNESS,
+    SET_SHOW_GUIDE,
+    SET_SLEEP_TIMEOUT,
+    SET_CONTRAST,
+    SET_QUICK_BIND,
+    SET_BATTERY,
+    SET_FW_INFO,
+    SET_FACTORY_RESET
+};
+
 const char* SETTINGS_NAMES[] = {
+    "Host OS",
+    "Bluetooth",
+    "Brightness",
+    "Show Guide",
     "Sleep Timeout",
     "Contrast",
-    "Brightness",
     "Quick Bind",
-    "Bluetooth",
-    "Host OS",
-    "Show Guide",
+    "Battery",
     "FW Info",
     "Factory Reset"
 };
@@ -292,8 +309,11 @@ void clearFunction();
 double calculate(double a, double b, char op);
 String formatResult(double result);
 void goToSleep();
+void initBattery();
+static int readBatteryPinMv();
+static int readBatteryMv();
+void updateBattery();
 void showGuide();
-void showChangelog();
 bool waitForEnter();
 bool isKeyPressed(char target);
 GuideAction waitForGuideNav(bool canScrollUp, bool canScrollDown);
@@ -545,32 +565,35 @@ void handleKey(char key) {
             }
             if (key == '5' || key == '=') {
                 switch (settingsIndex) {
-                    case 0: // Sleep Timeout
+                    case SET_HOST_OS:
+                        settingsView = SETTINGS_VIEW_ZOOM_PICK;
+                        break;
+                    case SET_BLUETOOTH:
+                        settingsView = SETTINGS_VIEW_BT;
+                        break;
+                    case SET_BRIGHTNESS:
+                        settingsView = SETTINGS_VIEW_BRIGHTNESS;
+                        break;
+                    case SET_SHOW_GUIDE:
+                        showGuide();
+                        break;
+                    case SET_SLEEP_TIMEOUT:
                         settingsView = SETTINGS_VIEW_TIMEOUT;
                         settingsInput = "";
                         break;
-                    case 1: // Contrast
+                    case SET_CONTRAST:
                         settingsView = SETTINGS_VIEW_CONTRAST;
                         break;
-                    case 2: // Brightness
-                        settingsView = SETTINGS_VIEW_BRIGHTNESS;
-                        break;
-                    case 3: // Quick Bind
+                    case SET_QUICK_BIND:
                         settingsView = SETTINGS_VIEW_QBIND_LIST;
                         break;
-                    case 4: // Bluetooth
-                        settingsView = SETTINGS_VIEW_BT;
+                    case SET_BATTERY:
+                        settingsView = SETTINGS_VIEW_BATTERY;
                         break;
-                    case 5: // Host OS
-                        settingsView = SETTINGS_VIEW_ZOOM_PICK;
-                        break;
-                    case 6: // Show Guide
-                        showGuide();
-                        break;
-                    case 7: // FW Info
+                    case SET_FW_INFO:
                         settingsView = SETTINGS_VIEW_FW_INFO;
                         break;
-                    case 8: // Factory Reset
+                    case SET_FACTORY_RESET:
                         settingsView = SETTINGS_VIEW_RESET_CONFIRM;
                         break;
                 }
@@ -798,7 +821,7 @@ static void drawSettingsList() {
 
 static void drawTimeoutEntry() {
     u8g2.setFont(u8g2_font_6x10_tr);
-    u8g2.drawStr(0, 28, "Sleep (min):");
+    u8g2.drawStr(0, 28, "Minutes:");
     String shown = settingsInput.length() > 0 ? settingsInput : String(sleepTimeoutMs / 60000);
     shown += "_";
     u8g2.drawStr(0, 46, shown.c_str());
@@ -806,18 +829,35 @@ static void drawTimeoutEntry() {
     u8g2.drawStr(0, 64, "[*]Bksp [=]Sv [NUM]Bk");
 }
 
-static void drawSlider(const char* label, uint8_t value) {
-    u8g2.setFont(u8g2_font_6x10_tr);
-    u8g2.drawStr(0, 28, label);
-    char buf[8];
-    snprintf(buf, sizeof(buf), "%u", value);
-    u8g2.drawStr(0, 46, buf);
-    // bar: 0..255 mapped to 0..120 px
-    int16_t barW = (int16_t)((uint16_t)value * 120 / 255);
-    u8g2.drawFrame(0, 50, 122, 6);
-    u8g2.drawBox(1, 51, barW, 4);
+// brightness/contrast use 10 discrete levels (1..10) spread across 0..255,
+// i.e. 25.5 per step. Level 1 is the dimmest we allow (0 would black out the
+// OLED / turn the LED off and you couldn't see to turn it back up).
+static uint8_t valueToLevel(uint8_t value) {
+    int level = (value * 10 + 127) / 255;  // round to nearest of 0..10
+    if (level < 1) level = 1;
+    if (level > 10) level = 10;
+    return (uint8_t)level;
+}
+
+static uint8_t levelToValue(uint8_t level) {
+    return (uint8_t)((int)level * 255 / 10);  // level 10 -> 255
+}
+
+static void drawSlider(uint8_t value) {
+    // label lives in the title bar; just draw the 10-segment level bar,
+    // centered in the body area between the header line and the footer
+    int level = valueToLevel(value);
+    const int w = 10, gap = 2, step = w + gap;  // 12 px per segment
+    const int barW = 10 * step - gap;           // 118 px total
+    const int x0 = (128 - barW) / 2;            // horizontally centered
+    const int h = 12, y = 29;                   // vertically centered in body
+    for (int i = 0; i < 10; i++) {
+        int x = x0 + i * step;
+        if (i < level) u8g2.drawBox(x, y, w, h);
+        else           u8g2.drawFrame(x, y, w, h);
+    }
     u8g2.setFont(u8g2_font_5x7_tr);
-    u8g2.drawStr(0, 64, "[8/2]+-10 [4/6]+-1 [=]Sv");
+    u8g2.drawStr(0, 64, "[8/2]+ - [=]Sv [NUM]Bk");
 }
 
 static void drawQbindList() {
@@ -877,14 +917,9 @@ static void drawQbindPick() {
 }
 
 static void drawResetConfirm() {
-    u8g2.setFont(u8g2_font_6x10_tr);
-    const char* l1 = "FACTORY RESET";
-    int16_t w1 = u8g2.getStrWidth(l1);
-    u8g2.drawStr((128 - w1) / 2, 26, l1);
-
     u8g2.setFont(u8g2_font_5x7_tr);
-    u8g2.drawStr(0, 40, "Wipes settings, binds,");
-    u8g2.drawStr(0, 50, "and shows guide on boot.");
+    u8g2.drawStr(0, 32, "Wipes settings, binds,");
+    u8g2.drawStr(0, 44, "and shows guide on boot.");
     u8g2.drawStr(0, 64, "[5]Confirm [NUM]Cancel");
 }
 
@@ -1053,6 +1088,24 @@ static void drawFwInfo() {
     u8g2.drawStr(0, 64, "[NUM] Back");
 }
 
+
+static void drawBatteryInfo() {
+    // live readout — also the bench tool for calibrating BATT_DIVIDER against
+    // a multimeter (compare "batt" mV to the cell, "pin" mV to the tap node)
+    int pinMv = readBatteryPinMv();
+    int battMv = (int)(pinMv * BATT_DIVIDER);
+    char line[24];
+    u8g2.setFont(u8g2_font_6x10_tr);
+    snprintf(line, sizeof(line), "%d.%03d V", battMv / 1000, battMv % 1000);
+    u8g2.drawStr(0, 30, line);
+    u8g2.setFont(u8g2_font_5x7_tr);
+    snprintf(line, sizeof(line), "batt: %d mV", battMv);
+    u8g2.drawStr(0, 44, line);
+    snprintf(line, sizeof(line), "pin:  %d mV", pinMv);
+    u8g2.drawStr(0, 54, line);
+    u8g2.drawStr(0, 64, "[NUM] Back");
+}
+
 void drawSettingsPage() {
     if (settingsView == SETTINGS_VIEW_LIST) {
         drawMenuHeader("SETTINGS");
@@ -1078,14 +1131,28 @@ void drawSettingsPage() {
         u8g2.drawStr(0, 10, "FORGET?");
     } else if (settingsView == SETTINGS_VIEW_ZOOM_PICK) {
         u8g2.drawStr(0, 10, "HOST OS");
+    } else if (settingsView == SETTINGS_VIEW_BATTERY) {
+        u8g2.drawStr(0, 10, "BATTERY");
+    } else if (settingsView == SETTINGS_VIEW_CONTRAST) {
+        u8g2.drawStr(0, 10, "CONTRAST");
+    } else if (settingsView == SETTINGS_VIEW_BRIGHTNESS) {
+        u8g2.drawStr(0, 10, "BRIGHTNESS");
+    } else if (settingsView == SETTINGS_VIEW_TIMEOUT) {
+        u8g2.drawStr(0, 10, "SLEEP TIMEOUT");
+    } else if (settingsView == SETTINGS_VIEW_QBIND_LIST) {
+        u8g2.drawStr(0, 10, "QUICK BIND");
+    } else if (settingsView == SETTINGS_VIEW_FW_INFO) {
+        u8g2.drawStr(0, 10, "FW INFO");
+    } else if (settingsView == SETTINGS_VIEW_RESET_CONFIRM) {
+        u8g2.drawStr(0, 10, "FACTORY RESET");
     } else {
         u8g2.drawStr(0, 10, "SETTINGS");
     }
     u8g2.drawHLine(0, 12, 128);
     switch (settingsView) {
         case SETTINGS_VIEW_TIMEOUT:     drawTimeoutEntry(); break;
-        case SETTINGS_VIEW_CONTRAST:    drawSlider("Contrast:",   oledContrast);  break;
-        case SETTINGS_VIEW_BRIGHTNESS:  drawSlider("Brightness:", ledBrightness); break;
+        case SETTINGS_VIEW_CONTRAST:    drawSlider(oledContrast);  break;
+        case SETTINGS_VIEW_BRIGHTNESS:  drawSlider(ledBrightness); break;
         case SETTINGS_VIEW_FW_INFO:     drawFwInfo(); break;
         case SETTINGS_VIEW_QBIND_LIST:  drawQbindList(); break;
         case SETTINGS_VIEW_QBIND_PICK:  drawQbindPick(); break;
@@ -1096,6 +1163,7 @@ void drawSettingsPage() {
         case SETTINGS_VIEW_BT_BOND_OS:  drawBTBondOSPick(); break;
         case SETTINGS_VIEW_BT_FORGET:   drawBTForgetConfirm(); break;
         case SETTINGS_VIEW_ZOOM_PICK:   drawZoomPick(); break;
+        case SETTINGS_VIEW_BATTERY:     drawBatteryInfo(); break;
         default: break;
     }
 }
@@ -1118,7 +1186,7 @@ void saveSettings() {
 void factoryReset() {
     Preferences p;
     p.begin("t2", false);
-    p.clear();  // wipes everything including "guided" and "fwRel"
+    p.clear();  // wipes everything including the "guided" first-boot flag
     p.end();
 
     sleepTimeoutMs = DEFAULT_SLEEP_TIMEOUT;
@@ -1338,29 +1406,25 @@ void handleSettingsKey(char key) {
 
     if (settingsView == SETTINGS_VIEW_CONTRAST || settingsView == SETTINGS_VIEW_BRIGHTNESS) {
         uint8_t* val = (settingsView == SETTINGS_VIEW_CONTRAST) ? &oledContrast : &ledBrightness;
-        int delta = 0;
-        if (key == '8') delta = 10;
-        else if (key == '2') delta = -10;
-        else if (key == '6') delta = 1;
-        else if (key == '4') delta = -1;
-        else if (key == '=') {
+        if (key == '=') {
             saveSettings();
             settingsView = SETTINGS_VIEW_LIST;
             drawMenu();
             return;
         }
-        if (delta != 0) {
-            int next = (int)*val + delta;
-            if (next < 0) next = 0;
-            if (next > 255) next = 255;
-            *val = (uint8_t)next;
-            if (settingsView == SETTINGS_VIEW_CONTRAST) {
-                u8g2.setContrast(oledContrast);
-            } else {
-                analogWrite(LED_PIN, ledBrightness);
-            }
-            drawMenu();
+        int level = valueToLevel(*val);
+        if (key == '8' || key == '6') level++;        // up / right
+        else if (key == '2' || key == '4') level--;   // down / left
+        else return;
+        if (level < 1) level = 1;
+        if (level > 10) level = 10;
+        *val = levelToValue((uint8_t)level);
+        if (settingsView == SETTINGS_VIEW_CONTRAST) {
+            u8g2.setContrast(oledContrast);
+        } else {
+            analogWrite(LED_PIN, ledBrightness);
         }
+        drawMenu();
         return;
     }
 
@@ -1560,7 +1624,8 @@ void handleSettingsKey(char key) {
         return;
     }
 
-    // SETTINGS_VIEW_FW_INFO: only C exits (handled above)
+    // SETTINGS_VIEW_FW_INFO and SETTINGS_VIEW_BATTERY: read-only, only C exits
+    // (handled above)
 }
 
 
@@ -1856,21 +1921,40 @@ void showGuide() {
 }
 
 
-void showChangelog() {
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_6x10_tr);
-    u8g2.drawStr(0, 10, "What's New:");
-    u8g2.drawHLine(0, 12, 128);
-    
-    u8g2.setFont(u8g2_font_5x7_tr);
-    for (int i = 0; i < CHANGELOG_LINES && i < 6; i++) {
-        u8g2.drawStr(0, 24 + (i * 8), CHANGELOG[i]);
+void initBattery() {
+    // ~0-3.1V usable range; the 2:1 divider keeps the pin <= ~2.1V at 4.2V batt
+    analogSetPinAttenuation(BATT_PIN, ADC_11db);
+    // prime the ADC and let the RC filter settle before the first real read
+    for (int i = 0; i < 8; i++) analogReadMilliVolts(BATT_PIN);
+}
+
+
+static int readBatteryPinMv() {
+    const int N = 32;
+    uint32_t sum = 0;
+    for (int i = 0; i < N; i++) sum += analogReadMilliVolts(BATT_PIN);
+    return (int)(sum / N);
+}
+
+
+static int readBatteryMv() {
+    return (int)(readBatteryPinMv() * BATT_DIVIDER);
+}
+
+
+void updateBattery() {
+    int mv = readBatteryMv();
+    bool prev = lowBattery;
+    if (mv < BATT_VALID_MIN_MV || mv > BATT_VALID_MAX_MV) {
+        // on USB (or no live cell): never show a low-battery warning
+        lowBattery = false;
+    } else if (mv <= BATT_LOW_MV) {
+        lowBattery = true;
+    } else if (mv >= BATT_CLEAR_MV) {
+        lowBattery = false;
     }
-    
-    u8g2.drawStr(30, 64, "[=] Continue");
-    u8g2.sendBuffer();
-    lastActivity = millis();
-    waitForEnter();
+    // redraw only in the normal view; the menu doesn't show the battery icon
+    if (lowBattery != prev && macro.state != MACRO_MENU) updateDisplay();
 }
 
 
@@ -1878,6 +1962,7 @@ void setup() {
     pinMode(WAKE_PIN, INPUT_PULLUP);
     pinMode(LED_PIN, OUTPUT);
     initMatrix();
+    initBattery();
     Wire.begin(SDA_PIN, SCL_PIN);
     u8g2.begin();
     u8g2.setFlipMode(1); // rotate display 180 degrees
@@ -1903,23 +1988,15 @@ void setup() {
     esp_sleep_wakeup_cause_t wakeup = esp_sleep_get_wakeup_cause();
     if (wakeup == ESP_SLEEP_WAKEUP_UNDEFINED) {
         bool firstBoot = prefs.getBool("guided", false) == false;
-        String lastRelease = prefs.getString("fwRel", "");
 #ifdef FORCE_FIRST_BOOT
         firstBoot = true;
 #endif
 
+        showBootScreen();
         if (firstBoot) {
-            showBootScreen();
             welcomeText();
             showGuide();
             prefs.putBool("guided", true);
-            prefs.putString("fwRel", FW_RELEASE);
-        } else if (lastRelease != FW_RELEASE) {
-            showBootScreen();
-            showChangelog();
-            prefs.putString("fwRel", FW_RELEASE);
-        } else {
-            showBootScreen();
         }
     }
     prefs.end();
@@ -1929,6 +2006,7 @@ void setup() {
     }
 
     lastActivity = millis();
+    updateBattery();  // initial read on wake/boot
     updateDisplay();
 }
 
@@ -1957,6 +2035,22 @@ void loop() {
         && millis() - lastBtTick > 1000) {
         drawMenu();
         lastBtTick = millis();
+    }
+
+    // periodic battery check (initial read happens on wake in setup)
+    static uint32_t lastBattCheck = 0;
+    if (millis() - lastBattCheck > BATT_SAMPLE_INTERVAL) {
+        updateBattery();
+        lastBattCheck = millis();
+    }
+
+    // live-refresh the battery readout while its page is open
+    static uint32_t lastBattView = 0;
+    if (macro.state == MACRO_MENU && menuPage == MENU_PAGE_SETTINGS
+        && settingsView == SETTINGS_VIEW_BATTERY
+        && millis() - lastBattView > 1000) {
+        drawMenu();
+        lastBattView = millis();
     }
 
     if (!numpadMode && millis() - lastActivity > sleepTimeoutMs) {
