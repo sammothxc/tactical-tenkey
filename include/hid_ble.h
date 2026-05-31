@@ -40,6 +40,12 @@ void hidBleSendString(const String& str);
 // modifier from the initial post-connect report otherwise.
 void hidBleClearReport();
 
+// Re-issue the fast HID connection-interval request to the connected peer.
+// Called shortly after connect because some hosts (Windows notably) ignore the
+// conn-param request made during the initial pre-encryption phase, leaving the
+// link on a slow interval that causes laggy, inconsistent typing.
+void hidBleApplyFastConnParams();
+
 // Returns the 6-byte MAC of the currently connected peer, or nullptr if no
 // connection is up or the address hasn't been captured yet. The pointer is
 // only valid while the connection lasts.

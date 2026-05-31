@@ -203,6 +203,7 @@ enum BleMode {
 };
 BleMode bleMode = BLE_MODE_OFF;
 uint32_t bleModeUntil = 0;
+uint32_t bleConnParamsAt = 0;  // when to re-issue fast conn params (0 = done/idle)
 const uint32_t BLE_PAIRING_WINDOW_MS = 180000;
 const uint32_t BLE_ADVERTISE_WINDOW_MS = 180000;
 uint8_t btMenuIdx = 0;
@@ -1231,12 +1232,20 @@ void blePoll() {
             bleMode = BLE_MODE_CONNECTED;
             bleConnected = true;
             bleModeUntil = 0;
+            // re-apply the fast HID connection interval after the link settles;
+            // hosts (Windows) ignore the request made at connect time
+            bleConnParamsAt = millis() + 1500;
             // clear any stuck modifier bits from the initial post-pair report
             // (macOS will latch a phantom Ctrl otherwise → trackpad → right-click)
             hidBleClearReport();
             // auto-apply zoom modifier based on which bonded peer connected
             applyConnectedPeerOS();
             updateDisplay();
+        }
+        // honor the deferred fast-conn-params re-request once the link settles
+        if (bleConnParamsAt != 0 && (int32_t)(millis() - bleConnParamsAt) >= 0) {
+            hidBleApplyFastConnParams();
+            bleConnParamsAt = 0;
         }
         return;
     }

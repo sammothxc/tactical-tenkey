@@ -21,13 +21,18 @@ public:
         if (param) {
             memcpy(s_peerMac, param->connect.remote_bda, 6);
             s_peerKnown = true;
-            // Request more relaxed connection parameters immediately so the
-            // host extends supervision timeout. Default Linux pick is ~420ms
-            // which is too tight — link drops before SMP can even start.
-            // Values: min/max in 1.25ms units, timeout in 10ms units.
+            // Ask for a fast HID-grade connection interval (7.5-15ms). macOS
+            // auto-picks a fast interval for HID peripherals; Windows holds a
+            // slow/power-saving one, which shows up as multi-second, erratic
+            // typing latency. This request fires before encryption, which some
+            // hosts (Windows) ignore during service discovery, so blePoll()
+            // re-issues it once the link settles (hidBleApplyFastConnParams).
+            // The generous supervision timeout also keeps tight links from
+            // dropping before pairing completes.
+            // Units: min/max in 1.25ms steps, timeout in 10ms steps.
             pServer->updateConnParams(param->connect.remote_bda,
-                                      0x18,    // 30ms min interval
-                                      0x28,    // 50ms max interval
+                                      0x06,    // 7.5ms min interval
+                                      0x0c,    // 15ms max interval
                                       0,       // 0 slave latency
                                       0x0190); // 4000ms supervision timeout
         }
@@ -102,11 +107,11 @@ void hidBleInit(bool pairingMode) {
         adv->setAdvertisementData(advData);
         adv->setScanResponse(false);
 
-        // Hint preferred connection params to the host (Slave Connection
-        // Interval Range AD type). Encourages Linux to pick relaxed values
-        // up front instead of the default tight 30-50ms / 420ms supervision.
-        adv->setMinPreferred(0x0018);  // 30ms
-        adv->setMaxPreferred(0x0028);  // 50ms
+        // Hint a fast HID connection interval to the host up front (Slave
+        // Connection Interval Range AD type), so a snappy interval can be
+        // chosen at connect time rather than a slow power-saving default.
+        adv->setMinPreferred(0x0006);  // 7.5ms
+        adv->setMaxPreferred(0x000c);  // 15ms
 
         adv->start();
     }
@@ -284,6 +289,22 @@ void hidBleClearReport() {
     if (bleActive && bleKb && bleKb->isConnected()) {
         bleKb->releaseAll();
     }
+}
+
+
+void hidBleApplyFastConnParams() {
+    if (!bleActive || !bleKb || !bleKb->isConnected()) return;
+    if (!PeerAwareBleKeyboard::s_peerKnown) return;
+    // Re-request the fast HID interval after the link has settled. Windows
+    // ignores the request made at connect time (pre-encryption); issuing it
+    // again post-encryption is what actually drops the interval to HID speed.
+    esp_ble_conn_update_params_t params = {};
+    memcpy(params.bda, PeerAwareBleKeyboard::s_peerMac, 6);
+    params.min_int = 0x06;   // 7.5ms
+    params.max_int = 0x0c;   // 15ms
+    params.latency = 0;
+    params.timeout = 0x0190; // 4000ms (units of 10ms)
+    esp_ble_gap_update_conn_params(&params);
 }
 
 
