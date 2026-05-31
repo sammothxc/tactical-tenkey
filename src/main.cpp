@@ -231,7 +231,7 @@ uint8_t bondMetaCount = 0;
 uint8_t btBondActionIdx = 0;  // selection within BT_BOND view (0 = Set OS, 1 = Forget)
 
 // macro quick bind: slot index holds a macro index, -1 = unbound
-// (slot 5 unused: -+5 is the FN chord)
+// (slot 5 unused: -+5 is the macro-menu chord)
 int8_t qbindSlots[10] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 const uint8_t QBIND_VALID_SLOTS[9] = {0, 1, 2, 3, 4, 6, 7, 8, 9};
 uint8_t qbindListIdx = 0;     // selection within QBIND_LIST (0..8 -> QBIND_VALID_SLOTS[idx])
@@ -441,15 +441,19 @@ char scanMatrix() {
     }
     if (!currentMinus || !currentStar) minusStarChord = false;
 
-    // FN + digit (0-9 except 5) = quick-bind macro trigger
-    // (8/2 tracked separately; 0 lives in `pressed`; 5 is part of FN itself)
-    if (fnPressed) {
+    // FN + digit = quick-bind macro trigger (calc mode only; in numpad mode
+    // '-'+digit is normal typing). FN here is just '-' held; the digit (0-9
+    // except 5) picks the slot. '-'+'5' is the macro-menu chord, so slot 5
+    // can't be a quick bind. (8/2 are tracked specially; the other digits live
+    // in `pressed`.)
+    if (!numpadMode && currentMinus) {
         char qbDigit = 0;
         if (pressed >= '0' && pressed <= '9') qbDigit = pressed;
         else if (currentEight) qbDigit = '8';
         else if (currentTwo)   qbDigit = '2';
 
         if (qbDigit && qbDigit != '5') {
+            minusFnUsed = true;  // consume '-' so it doesn't emit minus on release
             return (char)(0x10 + (qbDigit - '0'));  // 0x10..0x19, skipping 0x15
         }
     }
