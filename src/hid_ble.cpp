@@ -199,18 +199,18 @@ void hidBleSendNumpadKey(char key, bool numLockOn) {
 
     uint8_t code = 0;
     if (numLockOn) {
+        // Digits and '.' are sent as their ASCII chars, which the library maps
+        // to the MAIN-ROW key usages -- immune to the host's NumLock state. The
+        // keypad digit usages (KEY_NUM_*) are NumLock-dependent, so with NumLock
+        // off the host reads them as navigation (this is why BLE NUM mode still
+        // produced nav keys on Windows). Operators keep the keypad usages, which
+        // are already NumLock-independent. Mirrors the USB path in hid_usb.cpp.
         switch (key) {
-            case '0': code = KEY_NUM_0;        break;
-            case '1': code = KEY_NUM_1;        break;
-            case '2': code = KEY_NUM_2;        break;
-            case '3': code = KEY_NUM_3;        break;
-            case '4': code = KEY_NUM_4;        break;
-            case '5': code = KEY_NUM_5;        break;
-            case '6': code = KEY_NUM_6;        break;
-            case '7': code = KEY_NUM_7;        break;
-            case '8': code = KEY_NUM_8;        break;
-            case '9': code = KEY_NUM_9;        break;
-            case '.': code = KEY_NUM_PERIOD;   break;
+            case '0': case '1': case '2': case '3': case '4':
+            case '5': case '6': case '7': case '8': case '9':
+            case '.':
+                code = (uint8_t)key;
+                break;
             case '+': code = KEY_NUM_PLUS;     break;
             case '-': code = KEY_NUM_MINUS;    break;
             case '*': code = KEY_NUM_ASTERISK; break;
