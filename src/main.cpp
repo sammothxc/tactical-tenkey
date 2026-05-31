@@ -243,7 +243,7 @@ const char* SETTINGS_NAMES[] = {
     "Brightness",
     "Quick Bind",
     "Bluetooth",
-    "Zoom Modifier",
+    "Host OS",
     "Show Guide",
     "FW Info",
     "Factory Reset"
@@ -560,7 +560,7 @@ void handleKey(char key) {
                     case 4: // Bluetooth
                         settingsView = SETTINGS_VIEW_BT;
                         break;
-                    case 5: // Zoom Modifier
+                    case 5: // Host OS
                         settingsView = SETTINGS_VIEW_ZOOM_PICK;
                         break;
                     case 6: // Show Guide
@@ -888,7 +888,7 @@ static void drawResetConfirm() {
 }
 
 static void drawZoomPick() {
-    const char* options[2] = { "Ctrl (Win/Linux)", "Cmd (macOS)" };
+    const char* options[2] = { "Windows/Linux", "macOS" };
     u8g2.setFont(u8g2_font_6x10_tr);
     for (int i = 0; i < 2; i++) {
         int y = 28 + (i * 14);
@@ -1076,7 +1076,7 @@ void drawSettingsPage() {
     } else if (settingsView == SETTINGS_VIEW_BT_FORGET) {
         u8g2.drawStr(0, 10, "FORGET?");
     } else if (settingsView == SETTINGS_VIEW_ZOOM_PICK) {
-        u8g2.drawStr(0, 10, "ZOOM MOD");
+        u8g2.drawStr(0, 10, "HOST OS");
     } else {
         u8g2.drawStr(0, 10, "SETTINGS");
     }
@@ -1595,6 +1595,12 @@ void drawBottomBar() {
         iconX -= ICON_WIDTH;  // blank space
     }
     
+    // OS group: Apple for macOS, Windows logo for Win/Linux (default)
+    iconX -= 2;  // spacing
+    iconX -= ICON_WIDTH;
+    u8g2.drawXBM(iconX, iconY, ICON_WIDTH, ICON_HEIGHT,
+                 zoomModifier == 1 ? ICON_APPLE : ICON_WINDOWS);
+
     // numpad mode or blank
     iconX -= 2;  // spacing
     if (numpadMode) {

@@ -230,17 +230,31 @@ void hidBleSendNumpadKey(char key, bool numLockOn) {
             bleKb->releaseAll();
             return;
         }
+        // Home/End/PageUp/PageDown -> cursor moves on both OSes (mirrors the USB
+        // path): Home/End -> line start/end, PageUp/PageDown -> doc top/bottom.
+        if (key == '7' || key == '1' || key == '9' || key == '3') {
+            bool mac = (zoomModifier == 1);
+            uint8_t mod = 0, k = 0;
+            switch (key) {
+                case '7': mod = mac ? KEY_LEFT_GUI : 0;             k = mac ? KEY_LEFT_ARROW  : KEY_HOME; break; // line start
+                case '1': mod = mac ? KEY_LEFT_GUI : 0;             k = mac ? KEY_RIGHT_ARROW : KEY_END;  break; // line end
+                case '9': mod = mac ? KEY_LEFT_GUI : KEY_LEFT_CTRL; k = mac ? KEY_UP_ARROW    : KEY_HOME; break; // document top
+                case '3': mod = mac ? KEY_LEFT_GUI : KEY_LEFT_CTRL; k = mac ? KEY_DOWN_ARROW  : KEY_END;  break; // document bottom
+            }
+            if (mod) bleKb->press(mod);
+            bleKb->press(k);
+            delay(10);
+            bleKb->release(k);
+            bleKb->releaseAll();
+            return;
+        }
         switch (key) {
             case '0': code = KEY_INSERT;     break;
-            case '1': code = KEY_END;        break;
             case '2': code = KEY_DOWN_ARROW; break;
-            case '3': code = KEY_PAGE_DOWN;  break;
             case '4': code = KEY_LEFT_ARROW; break;
             case '5': return;
             case '6': code = KEY_RIGHT_ARROW; break;
-            case '7': code = KEY_HOME;       break;
             case '8': code = KEY_UP_ARROW;   break;
-            case '9': code = KEY_PAGE_UP;    break;
             case '.': code = KEY_DELETE;     break;
             case '/': code = KEY_TAB;        break;
             case '*': code = KEY_BACKSPACE;  break;

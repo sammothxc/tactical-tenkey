@@ -106,17 +106,34 @@ void hidUsbSendNumpadKey(char key, bool numLockOn) {
             Keyboard.releaseAll();
             return;
         }
+        // Home/End/PageUp/PageDown -> cursor-moving combos so they always move
+        // the caret visibly on both OSes. The bare nav usages only scroll on
+        // macOS (and need scrollable content elsewhere), so map them to:
+        // Home/End -> line start/end, PageUp/PageDown -> document top/bottom,
+        // using the host OS (zoomModifier: 0 = Win/Linux default, 1 = macOS).
+        if (key == '7' || key == '1' || key == '9' || key == '3') {
+            bool mac = (zoomModifier == 1);
+            uint8_t mod = 0, k = 0;
+            switch (key) {
+                case '7': mod = mac ? KEY_LEFT_GUI : 0;             k = mac ? KEY_HID_LEFT  : KEY_HID_HOME; break; // line start
+                case '1': mod = mac ? KEY_LEFT_GUI : 0;             k = mac ? KEY_HID_RIGHT : KEY_HID_END;  break; // line end
+                case '9': mod = mac ? KEY_LEFT_GUI : KEY_LEFT_CTRL; k = mac ? KEY_HID_UP    : KEY_HID_HOME; break; // document top
+                case '3': mod = mac ? KEY_LEFT_GUI : KEY_LEFT_CTRL; k = mac ? KEY_HID_DOWN  : KEY_HID_END;  break; // document bottom
+            }
+            if (mod) Keyboard.press(mod);
+            Keyboard.pressRaw(k);
+            delay(10);
+            Keyboard.releaseRaw(k);
+            Keyboard.releaseAll();
+            return;
+        }
         switch (key) {
             case '0': keycode = KEY_HID_INSERT; break;
-            case '1': keycode = KEY_HID_END; break;
             case '2': keycode = KEY_HID_DOWN; break;
-            case '3': keycode = KEY_HID_PAGEDOWN; break;
             case '4': keycode = KEY_HID_LEFT; break;
             case '5': return; // center has no nav function
             case '6': keycode = KEY_HID_RIGHT; break;
-            case '7': keycode = KEY_HID_HOME; break;
             case '8': keycode = KEY_HID_UP; break;
-            case '9': keycode = KEY_HID_PAGEUP; break;
             case '.': keycode = KEY_HID_DELETE; break;
             case '/': keycode = KEY_HID_TAB; break;
             case '*': keycode = KEY_HID_BACKSPACE; break;
